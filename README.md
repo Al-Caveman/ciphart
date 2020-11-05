@@ -26,6 +26,13 @@
     <img src="pics/2.png">
 </p>
 
+# installation
+
+1.  install `libsodium`.
+2. run `make`.
+3. somehow put `ciphart` executable somewhere in `PATH` (personally i put
+   its symbolic link `/usr/bin/`).
+
 # how entropy is calculated?
 
 [the _idea_ is explained
