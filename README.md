@@ -33,6 +33,12 @@ here](https://crypto.stackexchange.com/questions/85676/how-to-estimate-the-maxim
 for more info, you may read the code (it's small), or ask me by submitting
 an issue.
 
+note that this entropy calculation is not a mere heuristic.  this is
+guaranteed to be true regarless of attacker's hardware/software
+implementation of xchacha20.  i.e. regardless of how fast attacker's
+xchacha20 implementation is, the effect of the KDF is maintained.  e.g. if
+the KDF claims to inject `20` bits of entropy, it is held.
+
 # how to utter `ciphart`?
 
 two options:
