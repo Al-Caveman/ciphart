@@ -30,8 +30,8 @@
 
 1.  install [`libsodium`](https://libsodium.gitbook.io/doc/).
 2. run `make`.
-3. somehow put `ciphart` executable somewhere in `PATH` (personally i put
-   its symbolic link `/usr/bin/`).
+3. somehow put `ciphart` executable somewhere in `PATH` (personally i
+   symbolically linked it to `/usr/bin/cipher`).
 
 # how entropy is calculated?
 
