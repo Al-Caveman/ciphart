@@ -14,7 +14,7 @@
   library.  not much apps support xchacha20 as it is relatively new.
 - simple api that makes it easy to call it with other apps.  e.g. passwords
   and plaintext data can be both fed via STDIN, something you cannot do
-  with some apps, such as `scrypt`.
+  with some apps, such as [`scrypt`](https://www.tarsnap.com/scrypt.html).
 - only `472` lines of code!  so less things to go wrong, and easy to audit.
 - looks _beautiful_!  it is _the_ most beautiful crypto app!
 
