@@ -75,7 +75,7 @@ void ciphart_free(
 void ciphart_get_key(unsigned char *key);
 
 /* exponentiation function */
-unsigned long long cipher_pow(long entropy);
+unsigned long long ciphart_pow(long entropy);
 
 int main(int argc, char **argv) {
     /* initialise libsodium */
@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
     );
     unsigned char *buf_tmp;
     unsigned long long ent_len;
-    unsigned long long i = 0, max = cipher_pow(entropy) - 1;
+    unsigned long long i = 0, max = ciphart_pow(entropy) - 1;
     size_t min_size = ((sizeof i) < (CHUNK_ENC)) ? (i) : (CHUNK_ENC);
     time_t t_start = time(NULL), t_left, t_last = 0, t_scaled;
     const char *t_unit;
@@ -464,7 +464,7 @@ void ciphart_get_key(unsigned char *key) {
 }
 
 /* exponentiation function */
-unsigned long long cipher_pow(long entropy) {
+unsigned long long ciphart_pow(long entropy) {
     long i;
     unsigned long long exp = 2;
     for (i = 0; i < entropy; i++) exp *= 2;
