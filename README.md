@@ -9,9 +9,9 @@
   expect you to set it as high as you can suffer, without giving you any
   clue of how much security do you gain (in the unit of entropy bits added
   to your password).
-- uses a powerful algorithm, xchacha20, as implemented by `libsodium`; a
-  modern crypto library.  not much apps support xchacha20 as it is
-  relatively new.
+- uses a powerful algorithm, xchacha20, as implemented by
+  [`libsodium`](https://libsodium.gitbook.io/doc/); a modern crypto
+  library.  not much apps support xchacha20 as it is relatively new.
 - simple api that makes it easy to call it with other apps.  e.g. passwords
   and plaintext data can be both fed via STDIN, something you cannot do
   with some apps, such as `scrypt`.
@@ -28,7 +28,7 @@
 
 # installation
 
-1.  install `libsodium`.
+1.  install [`libsodium`](https://libsodium.gitbook.io/doc/).
 2. run `make`.
 3. somehow put `ciphart` executable somewhere in `PATH` (personally i put
    its symbolic link `/usr/bin/`).
