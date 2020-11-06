@@ -29,7 +29,7 @@
 #include "license.h" /* WARRANTY, CONDITIONS */
 
 #define APP_NAME "ciphart"
-#define APP_VERSION "0.0.0a"
+#define APP_VERSION "1.0.0"
 #define APP_YEAR "2020"
 #define APP_URL "https://github.com/Al-Caveman/ciphart"
 #define CMD_ENC 0
@@ -74,8 +74,8 @@ void ciphart_free(
 /* obtain key from password from STDIN */
 void ciphart_get_key(unsigned char *key);
 
-/* exponentiation function */
-unsigned long long ciphart_pow(long entropy);
+/* calculates number of iterations from entropy bits */
+unsigned long long ciphart_entropy_to_iterations(long entropy);
 
 int main(int argc, char **argv) {
     /* initialise libsodium */
@@ -215,11 +215,12 @@ int main(int argc, char **argv) {
     );
     unsigned char *buf_tmp;
     unsigned long long ent_len;
-    unsigned long long i = 0, max = ciphart_pow(entropy) - 1;
+    unsigned long long i = 0, max = ciphart_entropy_to_iterations(entropy);
     size_t min_size = ((sizeof i) < (CHUNK_ENC)) ? (i) : (CHUNK_ENC);
     time_t t_start = time(NULL), t_left, t_last = 0, t_scaled;
     const char *t_unit;
-    for (i = 0; i < max; i++) {
+    ciphart_err("max? %llu", max);
+    for (i = 0; i <= max; i++) {
         memcpy(buf_entropy, &i, min_size);
         crypto_secretstream_xchacha20poly1305_push(
             &state, buf_ciphertext, &ent_len, buf_entropy, CHUNK_CLR,
@@ -229,7 +230,7 @@ int main(int argc, char **argv) {
         buf_ciphertext = buf_entropy;
         buf_entropy = buf_tmp;
         if (i != 0 && (i % UI_UPDATE) == 0) {
-            t_left = (max - i) / (i / (time(NULL) - t_start));
+            t_left = (max - i) / (i / (time(NULL) - t_start + 1));
             if (t_left/60/60/24/30/12/100/1000) {
                 t_scaled = t_left/60/60/24/30/12/100/1000;
                 t_unit = "hundred thousand years";
@@ -261,7 +262,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-    memcpy(key, buf_ciphertext, SIZE_KEY);
+    crypto_generichash(key, SIZE_KEY, buf_ciphertext, CHUNK_ENC, NULL, 0);
 
     /* open output file */
     FILE *fp_out;
@@ -389,7 +390,7 @@ void ciphart_help(char *exec_name) {
         stdout,
         "%s {e,d} PIN POUT [H]\n"
         "%s {w,c,h}\n\n"
-        "   e     enctypts plaintext in PIN into ciphertext in POUT.\n\n"
+        "   e     encrypts plaintext in PIN into ciphertext in POUT.\n\n"
         "   d     decrypts ciphertext in PIN into plaintext in POUT.\n\n"
         "   PIN   path to input file.  STDIN if '-'.\n\n"
         "   POUT  path to output file.  STDOUT if '-'.\n\n"
@@ -407,14 +408,14 @@ void ciphart_help(char *exec_name) {
         "         other app has this feature as far as i know; only\n"
         "         %s has this mega-neat feature.\n\n"
         "         other apps just spit some raw KDF parameters at you,\n"
-        "         and simply expect you to suck it, without really\n"
+        "         and simply expect you to s*ck it, without really\n"
         "         knowing how much of entropy-equivalency bits are you\n"
-        "         gaining.  how can you know if you've sucked enough?\n"
-        "         did you suck enough?  or should you suck even more?\n"
+        "         gaining.  how can you know if you've s*cked enough?\n"
+        "         did you s*ck enough?  or should you s*ck even more?\n"
         "         you simply don't know!  but %s elegantly quantifies\n"
-        "         your suckage in security terms in the unit of entropy\n"
+        "         your s*ckage in security terms in the unit of entropy\n"
         "         bits, so that, at least, you have an idea about how\n"
-        "         good your sucking is.\n\n"
+        "         good your s*cking is.\n\n"
         "   w     shows warranty notice.\n\n"
         "   c     shows usage conditions.\n\n"
         "   h     shows this help.\n",
@@ -463,10 +464,14 @@ void ciphart_get_key(unsigned char *key) {
     sodium_free(buf);
 }
 
-/* exponentiation function */
-unsigned long long ciphart_pow(long entropy) {
+/* calculates number of iterations from entropy bits */
+unsigned long long ciphart_entropy_to_iterations(long entropy) {
+    /* when entropy = 64, exp will overflow into 0.  this is desirable,
+     * since the output is substracted by 1, hence reverting any 0 into
+     * ULLONG_MAX.
+     */
     long i;
     unsigned long long exp = 2;
-    for (i = 0; i < entropy; i++) exp *= 2;
-    return exp;
+    for (i = 1; i < entropy; i++) exp *= 2;
+    return exp - 1;
 }
