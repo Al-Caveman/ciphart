@@ -219,7 +219,6 @@ int main(int argc, char **argv) {
     size_t min_size = ((sizeof i) < (CHUNK_ENC)) ? (i) : (CHUNK_ENC);
     time_t t_start = time(NULL), t_left, t_last = 0, t_scaled;
     const char *t_unit;
-    ciphart_err("max? %llu", max);
     for (i = 0; i <= max; i++) {
         memcpy(buf_entropy, &i, min_size);
         crypto_secretstream_xchacha20poly1305_push(
