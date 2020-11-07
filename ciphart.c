@@ -29,7 +29,7 @@
 #include "license.h" /* WARRANTY, CONDITIONS */
 
 #define APP_NAME "ciphart"
-#define APP_VERSION "1.0.0"
+#define APP_VERSION "1.0.2"
 #define APP_YEAR "2020"
 #define APP_URL "https://github.com/Al-Caveman/ciphart"
 #define CMD_ENC 0
