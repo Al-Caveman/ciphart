@@ -1,24 +1,31 @@
+<p align="center">
+    <img src="pics/logo.png">
+</p>
+
 # intro
 
-`ciphart` is a neat file encryption/decryption tool with these features:
+`ciphart` can do:
 
-- the only file encryption/decryption tool that presents to you parameters
-  of the key derivation function (KDF)by means of equivalency to entropy
-  bits added to your password!  note that this doesn't literally inject
-  entropy into the password, but is rather equivalent to it.  also note
-  that this equivalency is not a heuristic, but is guaranteed.  this is a
-  neat way to interpret KDF's parameters.  other KDF's just give you some
-  complexity parameters, and expect you to set it as high as you can
-  suffer, without giving you any clue of how much security do you gain (in
-  the unit of entropy bits added to your password).
-- uses a powerful algorithm, xchacha20, as implemented by
-  [`libsodium`](https://libsodium.gitbook.io/doc/); a modern crypto
-  library.  not much apps support xchacha20 as it is relatively new.
-- simple api that makes it easy to call it with other apps.  e.g. passwords
-  and plaintext data can be both fed via STDIN, something you cannot do
-  with some apps, such as [`scrypt`](https://www.tarsnap.com/scrypt.html).
-- only `454` lines of code!  so less things to go wrong, and easy to audit.
-- looks _beautiful_!  it is _the_ most beautiful crypto app!
+- only encrypt/decrypt a file using xchacha20 (i.e. `-e` and `-d` actions).
+- only derive a more secure key using a novel key derivation function (i.e.
+  `-k` action).
+- do both (i.e. `-ek` and `-dk` actions).
+
+but, you may ask, why yet another tool?  isn't the tool
+[`scrypt`](https://www.tarsnap.com/scrypt.html) enough?  answer is _no_,
+here is why:
+
+- the novel key derivation function is the only one out there that
+  objectively quantifies the amount of increased security against
+  brute-forcing attacks in the unit of entropy bits.  this is also
+  guaranteed independent of attacker's hardware.
+- xchacha20 is a new algorithm, and not much tools out there.  hence the
+  need to create a new tool.
+- neat command-line interface that allows to accept both, the password and
+  the input file via STDIN; something not possible with some tools such as
+  [`scrypt`](https://www.tarsnap.com/scrypt.html).
+- _looks_ very beautiful.  most likely it is _the_ most beautiful crypo cli
+  app out there.
 
 <p align="center">
     <img src="pics/1.png">
@@ -33,9 +40,9 @@
 1.  install [`libsodium`](https://libsodium.gitbook.io/doc/).
 2. run `make`.
 3. somehow put `ciphart` executable somewhere in `PATH` (personally i
-   symbolically linked it to `/usr/bin/cipher`).
+   symbolically linked it to `/usr/bin/ciphart`).
 
-# how entropy is calculated?
+# how entropy is calculated?  why is it guaranteed?
 
 [the _idea_ is explained
 here](https://crypto.stackexchange.com/questions/85676/how-to-estimate-the-maximum-computational-cost-bound-for-key-derivation-function).
@@ -55,5 +62,5 @@ had `20` extra entropy bits.
 
 two options:
 
-- `saif art`.
-- `sai fart`.
+- `sai fart` (preferred).
+- `sip heart`.
