@@ -29,7 +29,7 @@
 #include "license.h" /* WARRANTY, CONDITIONS */
 
 #define APP_NAME "ciphart"
-#define APP_VERSION "1.0.2"
+#define APP_VERSION "2.0.0"
 #define APP_YEAR "2020"
 #define APP_URL "https://github.com/Al-Caveman/ciphart"
 #define CMD_ENC 0
@@ -39,6 +39,7 @@
 #define CHUNK_PASS 4096
 #define CHUNK_CLR 4096
 #define CHUNK_ENC (CHUNK_CLR+crypto_secretstream_xchacha20poly1305_ABYTES)
+#define SIZE_NONCE crypto_stream_xsalsa20_NONCEBYTES
 #define SIZE_HEADER crypto_secretstream_xchacha20poly1305_HEADERBYTES
 #define SIZE_KEY crypto_secretstream_xchacha20poly1305_KEYBYTES
 #define BITS_KEY (SIZE_KEY*CHAR_BIT)
@@ -68,17 +69,26 @@ int ciphart_fputs(const char *s);
 /* free heaps */
 void ciphart_free(
     unsigned char *h1, unsigned char *h2, unsigned char *h3,
-    unsigned char *h4, unsigned char *h5, FILE *fp1, FILE *fp2 
+    unsigned char *h4, FILE *fp1, FILE *fp2 
 );
 
 /* obtain key from password from STDIN */
 void ciphart_get_key(unsigned char *key);
 
 /* calculates number of iterations from entropy bits */
-unsigned long long ciphart_entropy_to_iterations(long entropy);
+unsigned long long ciphart_entropy_to_iter(long entropy);
+
+/* derive a more expensive key that's worth 'entropy' bits */
+int ciphart_complicate (
+    unsigned char *key,
+    unsigned char *buf_cleartext,
+    unsigned char *buf_ciphertext,
+    long entropy
+);
 
 int main(int argc, char **argv) {
     /* initialise libsodium */
+    int return_value = 1;
     char *exec_name = argv[0];
     ciphart_banner(exec_name);
     if (sodium_init() != 0) {
@@ -87,11 +97,9 @@ int main(int argc, char **argv) {
     }
 
     /* parse arguments */
-    int arg_parse_err = ARG_PARSE_OK;
-    int cmd;
-    char *path_in, *path_out;
+    int arg_parse_err = ARG_PARSE_OK, cmd;
+    char *path_in, *path_out, *last;
     long entropy = DEFAULT_ENTROPY;
-    char *last;
     switch (argc) {
         case 2:
             switch (argv[1][0]) {
@@ -137,10 +145,10 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    /* allocate heaps */
+    /* allocate heaps and file pointers */
+    FILE *fp_in = NULL, *fp_out = NULL;
     unsigned char *buf_cleartext = sodium_malloc(CHUNK_CLR);
     unsigned char *buf_ciphertext = sodium_malloc(CHUNK_ENC);
-    unsigned char *buf_entropy = sodium_malloc(CHUNK_ENC);
     unsigned char *header = sodium_malloc(SIZE_HEADER);
     unsigned char *key = sodium_malloc(SIZE_KEY);
     if (
@@ -150,21 +158,18 @@ int main(int argc, char **argv) {
         || key == NULL
     ) {
         ciphart_err("failed to allocate memory");
-        ciphart_free(
-            buf_cleartext,
-            buf_ciphertext,
-            buf_entropy,
-            header, key,
-            NULL, NULL
-        );
-        return 1;
+        goto fail;
     }
 
     /* get key */
     ciphart_get_key(key);
+    
+    /* derive a more expensive key that's worth 'entropy' bits */
+    if (ciphart_complicate(key, buf_cleartext, buf_ciphertext, entropy)) {
+        goto fail;
+    }
 
     /* open input file */
-    FILE *fp_in;
     if (strcmp(path_in, "-") == 0) {
         fp_in = stdin;
     } else {
@@ -172,14 +177,7 @@ int main(int argc, char **argv) {
     }
     if (fp_in == NULL) {
         ciphart_err("failed to open input file '%s'", path_in);
-        ciphart_free(
-            buf_cleartext,
-            buf_ciphertext,
-            buf_entropy,
-            header, key,
-            NULL, NULL
-        );
-        return 1;
+        goto fail;
     }
 
     /* get header and state */
@@ -196,75 +194,11 @@ int main(int argc, char **argv) {
         );
         if (rfread != SIZE_HEADER || rinit != 0) {
             ciphart_err("incomplete header");
-            ciphart_free(
-                buf_cleartext,
-                buf_ciphertext,
-                buf_entropy,
-                header, key,
-                fp_in, NULL
-            );
-            return 1;
+            goto fail;
         }
     }
-
-    /* derive a more expensive key, such that it has the effect of adding
-     * 'entropy' bits to the key */
-    ciphart_info(
-        "as-if-injecting %ld entropy bits into password...",
-        entropy
-    );
-    unsigned char *buf_tmp;
-    unsigned long long ent_len;
-    unsigned long long i = 0, max = ciphart_entropy_to_iterations(entropy);
-    size_t min_size = ((sizeof i) < (CHUNK_ENC)) ? (i) : (CHUNK_ENC);
-    time_t t_start = time(NULL), t_left, t_last = 0, t_scaled;
-    const char *t_unit;
-    for (i = 0; i <= max; i++) {
-        memcpy(buf_entropy, &i, min_size);
-        crypto_secretstream_xchacha20poly1305_push(
-            &state, buf_ciphertext, &ent_len, buf_entropy, CHUNK_CLR,
-            NULL, 0, 0
-        );
-        buf_tmp = buf_ciphertext;
-        buf_ciphertext = buf_entropy;
-        buf_entropy = buf_tmp;
-        if (i != 0 && (i % UI_UPDATE) == 0) {
-            t_left = (max - i) / (i / (time(NULL) - t_start + 1));
-            if (t_left/60/60/24/30/12/100/1000) {
-                t_scaled = t_left/60/60/24/30/12/100/1000;
-                t_unit = "hundred thousand years";
-            } else if (t_left/60/60/24/30/12/100) {
-                t_scaled = t_left/60/60/24/30/12/100;
-                t_unit = "centuries";
-            } else if (t_left/60/60/24/30/12) {
-                t_scaled = t_left/60/60/24/30/12;
-                t_unit = "years";
-            } else if (t_left/60/60/24/30) {
-                t_scaled = t_left/60/60/24/30;
-                t_unit = "months";
-            } else if (t_left/60/60/24) {
-                t_scaled = t_left/60/60/24;
-                t_unit = "days";
-            } else if (t_left/60/60) {
-                t_scaled = t_left/60/60;
-                t_unit = "hours";
-            } else if (t_left/60) {
-                t_scaled = t_left/60;
-                t_unit = "minutes";
-            } else {
-                t_scaled = t_left;
-                t_unit = "seconds";
-            }
-            if (t_scaled - t_last) {
-                ciphart_info("approx. %ld %s left...", t_scaled, t_unit);
-                t_last = t_scaled;
-            }
-        }
-    }
-    crypto_generichash(key, SIZE_KEY, buf_ciphertext, CHUNK_ENC, NULL, 0);
 
     /* open output file */
-    FILE *fp_out;
     if (strcmp(path_out, "-") == 0) {
         fp_out = stdout;
     } else {
@@ -272,14 +206,7 @@ int main(int argc, char **argv) {
     }
     if (fp_out == NULL) {
         ciphart_err("failed to open output file '%s'", path_out);
-        ciphart_free(
-            buf_cleartext,
-            buf_ciphertext,
-            buf_entropy,
-            header, key,
-            fp_in, NULL
-        );
-        return 1;
+        goto fail;
     }
 
     /* encrypt/decrypt input */
@@ -312,40 +239,27 @@ int main(int argc, char **argv) {
                 ) != 0
             ) {
                 ciphart_err("incorrect password or corrupted input");
-                ciphart_free(
-                    buf_cleartext,
-                    buf_ciphertext,
-                    buf_entropy,
-                    header, key,
-                    fp_in, fp_out
-                );
-                return 1;
+                goto fail;
             }
             if (
                 tag == crypto_secretstream_xchacha20poly1305_TAG_FINAL && ! eof
             ) {
                 ciphart_err("premature end of input");
-                ciphart_free(
-                    buf_cleartext,
-                    buf_ciphertext,
-                    buf_entropy,
-                    header, key,
-                    fp_in, fp_out
-                );
-                return 1;
+                goto fail;
             }
             fwrite(buf_cleartext, 1, (size_t) out_len, fp_out);
         } while (! eof);
     }
 
+    return_value = 0;
+fail:
     ciphart_free(
         buf_cleartext,
         buf_ciphertext,
-        buf_entropy,
         header, key,
         fp_in, fp_out
     );
-    return 0;
+    return return_value;
 }
 
 /* print error */
@@ -435,13 +349,12 @@ int ciphart_fputs(const char *s) {
 /* free heaps */
 void ciphart_free(
     unsigned char *h1, unsigned char *h2, unsigned char *h3,
-    unsigned char *h4, unsigned char *h5, FILE *fp1, FILE *fp2 
+    unsigned char *h4, FILE *fp1, FILE *fp2 
 ) {
     if (h1 != NULL) sodium_free(h1);
     if (h2 != NULL) sodium_free(h2);
     if (h3 != NULL) sodium_free(h3);
     if (h4 != NULL) sodium_free(h4);
-    if (h5 != NULL) sodium_free(h5);
     if (fp1 != NULL) fclose(fp1);
     if (fp2 != NULL) fclose(fp2);
 }
@@ -464,7 +377,7 @@ void ciphart_get_key(unsigned char *key) {
 }
 
 /* calculates number of iterations from entropy bits */
-unsigned long long ciphart_entropy_to_iterations(long entropy) {
+unsigned long long ciphart_entropy_to_iter(long entropy) {
     /* when entropy = 64, exp will overflow into 0.  this is desirable,
      * since the output is substracted by 1, hence reverting any 0 into
      * ULLONG_MAX.
@@ -473,4 +386,69 @@ unsigned long long ciphart_entropy_to_iterations(long entropy) {
     unsigned long long exp = 2;
     for (i = 1; i < entropy; i++) exp *= 2;
     return exp - 1;
+}
+
+/* derive a more expensive key that's worth 'entropy' bits */
+int ciphart_complicate (
+    unsigned char *key, unsigned char *buf_cleartext,
+    unsigned char *buf_ciphertext, long entropy
+) {
+    ciphart_info(
+        "deriving a more expensive key worth %ld entropy bits...",
+        entropy
+    );
+    unsigned char *nonce = sodium_malloc(SIZE_NONCE);
+    if (nonce == NULL) {
+        ciphart_err("failed to allocate memory for storing the nonce");
+        return 1;
+    }
+    unsigned char *buf_tmp;
+    unsigned long long i, max_iter = ciphart_entropy_to_iter(entropy);
+    size_t min_size = (sizeof i < CHUNK_CLR) ? sizeof i : CHUNK_CLR;
+    time_t t_start = time(NULL), t_left, t_last = 0, t_scaled;
+    const char *t_unit;
+    for (i = 0; i <= max_iter; i++) {
+        memcpy(nonce, &i, min_size);
+        crypto_stream_xchacha20_xor(
+            buf_ciphertext, buf_cleartext, CHUNK_CLR, nonce, key
+        );
+        buf_tmp = buf_ciphertext;
+        buf_ciphertext = buf_cleartext;
+        buf_cleartext = buf_tmp;
+        if (i != 0 && (i % UI_UPDATE) == 0) {
+            t_left = (max_iter - i) / (i / (time(NULL) - t_start + 1));
+            if (t_left/60/60/24/30/12/100/1000) {
+                t_scaled = t_left/60/60/24/30/12/100/1000;
+                t_unit = "hundred thousand years";
+            } else if (t_left/60/60/24/30/12/100) {
+                t_scaled = t_left/60/60/24/30/12/100;
+                t_unit = "centuries";
+            } else if (t_left/60/60/24/30/12) {
+                t_scaled = t_left/60/60/24/30/12;
+                t_unit = "years";
+            } else if (t_left/60/60/24/30) {
+                t_scaled = t_left/60/60/24/30;
+                t_unit = "months";
+            } else if (t_left/60/60/24) {
+                t_scaled = t_left/60/60/24;
+                t_unit = "days";
+            } else if (t_left/60/60) {
+                t_scaled = t_left/60/60;
+                t_unit = "hours";
+            } else if (t_left/60) {
+                t_scaled = t_left/60;
+                t_unit = "minutes";
+            } else {
+                t_scaled = t_left;
+                t_unit = "seconds";
+            }
+            if (t_scaled - t_last) {
+                ciphart_info("approx. %ld %s left...", t_scaled, t_unit);
+                t_last = t_scaled;
+            }
+        }
+    }
+    sodium_free(nonce);
+    crypto_generichash(key, SIZE_KEY, buf_ciphertext, CHUNK_CLR, NULL, 0);
+    return 0;
 }
