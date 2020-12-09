@@ -6,26 +6,26 @@
 
 `ciphart` can do:
 
-- only encrypt/decrypt a file using xchacha20 (i.e. `-e` and `-d` actions).
-- only derive a more secure key using a novel key derivation function (i.e.
+- **encrypt/decrypt:** only encrypt/decrypt a file using xchacha20 (i.e. `-e` and `-d` actions).
+- **derive better keys:** only derive a more secure key using a novel key derivation function (i.e.
   `-k` action).
-- do both (i.e. `-ek` and `-dk` actions).
+- **both:** do both (i.e. `-ek` and `-dk` actions).
 
 but, you may ask, why yet another tool?  isn't the tool
 [`scrypt`](https://www.tarsnap.com/scrypt.html) enough?  answer is _no_,
 here is why:
 
-- the novel key derivation function is the only one out there that
-  objectively quantifies the amount of increased security against
-  brute-forcing attacks in the unit of entropy bits.  this is also
+- **guaranteed entropy:** the novel key derivation function is the only one
+  out there that objectively quantifies the amount of increased security
+  against brute-forcing attacks in the unit of entropy bits.  this is also
   guaranteed independent of attacker's hardware.
-- xchacha20 is a new algorithm, and not much tools out there.  hence the
-  need to create a new tool.
-- neat command-line interface that allows to accept both, the password and
-  the input file via STDIN; something not possible with some tools such as
-  [`scrypt`](https://www.tarsnap.com/scrypt.html).
-- _looks_ very beautiful.  most likely it is _the_ most beautiful crypo cli
-  app out there.
+- **modern crypto algorithm:** xchacha20 is a new algorithm, and not much
+  tools out there.  hence the need to create a new tool.
+- **made for humans:** neat command-line interface that allows to accept
+  both, the password and the input file via STDIN; something not possible
+  with some tools such as [`scrypt`](https://www.tarsnap.com/scrypt.html).
+- **made with _love_:** _looks_ very beautiful.  most likely it is _the_
+  most beautiful crypo cli app out there.
 
 <p align="center">
     <img src="pics/1.png">
