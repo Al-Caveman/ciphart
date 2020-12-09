@@ -290,17 +290,19 @@ int main(int argc, char **argv) {
         color_reset = COLOR_RESET;
     }
     ciphart_info("action:  %s.", act_desc);
-    ciphart_info(
-        "summary of parameters of the key drivation function:\n"
-        "    -m%10zu"   "  %s# pad's memory size.%s\n"
-        "    -t%10zd"   "  %s# tasks' size in pad.%s\n"
-        "    -r%10llu"  "  %s# rounds per task.%s\n"
-        "    -n%10.6lf" "  %s# entropy-worth difficulty to add.%s",
-        pad_size,    color, color_reset,
-        task_size,   color, color_reset,
-        task_rounds, color, color_reset,
-        entropy,     color, color_reset
-    );
+    if (flags & FLAG_K) {
+        ciphart_info(
+            "summary of parameters of the key drivation function:\n"
+            "    -m%10zu"   "  %s# pad's memory size.%s\n"
+            "    -t%10zd"   "  %s# tasks' size in pad.%s\n"
+            "    -r%10llu"  "  %s# rounds per task.%s\n"
+            "    -n%10.6lf" "  %s# entropy-worth difficulty to add.%s",
+            pad_size,    color, color_reset,
+            task_size,   color, color_reset,
+            task_rounds, color, color_reset,
+            entropy,     color, color_reset
+        );
+    }
 
     /* update chunk/buffer sizes of clear and cipher texts to match task
      * sizes.  this is required in order to guarantee that key derivation's
@@ -337,7 +339,7 @@ int main(int argc, char **argv) {
             r = key_r;
             goto fail;
         }
-    } else if (flags & (FLAG_E | FLAG_K)) {
+    } else if (flags & FLAG_E || ! (flags & FLAG_D)) {
         key_confirm = sodium_malloc(SIZE_KEY);
         if (key_confirm == NULL) {
             ciphart_err("failed to allocate memory for key confirmation.");
