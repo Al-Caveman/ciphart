@@ -625,10 +625,10 @@ void ciphart_help(char *exec_name) {
     fprintf(
         stdout,
         "%sSYNOPSIS%s\n"
-        " %s -{e,d}   [-i PATH] [-o PATH] [OPTIONS ...]\n"
-        " %s -k                 [-o PATH] [OPTIONS ...]\n"
-        " %s -{ek,dk} [-i PATH] [-o PATH] [OPTIONS ...]\n"
-        " %s -{w,c,h}                     [-p COLOR]\n\n"
+        " %s -{e,d}   [-s] [-i PATH] [-o PATH] [-p COLOR]\n"
+        " %s -k       [-s]           [-o PATH] [-p COLOR] [KDF ...]\n"
+        " %s -{ek,dk} [-s] [-i PATH] [-o PATH] [-p COLOR] [KDF ...]\n"
+        " %s -{w,c,h}                          [-p COLOR]\n\n"
 
         "%sACTIONS%s\n"
         " -e        only encrypt input plaintext into output ciphertext.\n"
@@ -640,18 +640,18 @@ void ciphart_help(char *exec_name) {
         " -c        show usage conditions.\n"
         " -h        show this help.\n\n"
 
-        "%sIO%s\n"
-        " -i PATH   path to input file.  PATH '-' means STDIN.\n"
-        " -o PATH   path to output file.  PATH '-' means STDOUT.\n\n"
-
         "%sOPTIONS%s\n"
         " -s        read passwords via STDIN.\n"
+        " -i PATH   path to input file.  PATH '-' means STDIN.\n"
+        " -o PATH   path to output file.  PATH '-' means STDOUT.\n"
+        " -p COLOR  when to show pretty colors.  default is '%s'.\n\n"
+
+        "%sKDF%s\n"
         " -m INT    size of memory pad.  default is '%lu'.\n"
         " -t INT    bytes of each task in the pad.  default is '%lu'.\n"
         " -r INT    repetition in each task.  default is '%llu'.\n"
         " -n REAL   entropy bits.  default is '%.2f'.\n"
-        " -j INT    number of concurrent threads.  default is '%d'.\n"
-        " -p COLOR  when to show pretty colors.  default is '%s'.\n\n"
+        " -j INT    number of concurrent threads.  default is '%d'.\n\n"
 
         "%sVALUES%s\n"
         " PATH      file path.  '-' means STDIN or STDOUT.\n"
@@ -669,16 +669,17 @@ void ciphart_help(char *exec_name) {
         " %d         pthread feailure.\n"
         " %d         bad password or corrupted input.\n"
         " %d         premature input end.\n",
-        color, color_reset,
+        color, color_reset, /* synopsis */
         exec_name, exec_name, exec_name, exec_name,
-        color, color_reset,
-        color, color_reset,
-        color, color_reset,
-        DFLT_PAD_SIZE, DFLT_TASK_SIZE,
-        DFLT_TASK_ROUNDS, DFLT_ENTRPY, DFLT_THREADS, PRETTY_AUTO,
-        color, color_reset,
+        color, color_reset, /* actions */
+        color, color_reset, /* options */
+        PRETTY_AUTO,
+        color, color_reset, /* kdf */
+        DFLT_PAD_SIZE, DFLT_TASK_SIZE, DFLT_TASK_ROUNDS, DFLT_ENTRPY,
+        DFLT_THREADS,
+        color, color_reset, /* values */
         PRETTY_AUTO, PRETTY_ALWAYS, PRETTY_NEVER,
-        color, color_reset,
+        color, color_reset, /* return codes */
         RETURN_OK, RETURN_FAIL_GENERAL, RETURN_FAIL_SODIUM,
         RETURN_FAIL_ARGS, RETURN_FAIL_IO, RETURN_FAIL_MEM,
         RETURN_FAIL_PTHREAD, RETURN_FAIL_BADPASS, RETURN_FAIL_BADEND
