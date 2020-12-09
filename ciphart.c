@@ -294,7 +294,7 @@ int main(int argc, char **argv) {
         ciphart_info(
             "summary of parameters of the key drivation function:\n"
             "    -m%10zu"   "  %s# pad's memory size.%s\n"
-            "    -t%10zd"   "  %s# tasks' size in pad.%s\n"
+            "    -t%10zd"   "  %s# tasks' size in the pad.%s\n"
             "    -r%10llu"  "  %s# rounds per task.%s\n"
             "    -n%10.6lf" "  %s# entropy-worth difficulty to add.%s",
             pad_size,    color, color_reset,
