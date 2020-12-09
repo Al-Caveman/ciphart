@@ -61,8 +61,8 @@ had `20` extra entropy bits.
 
 here is an example: 
 
-1. starting from (Kerckhoffs's
-   principle)[https://en.wikipedia.org/wiki/Kerckhoffs%27s_principle],
+1. starting from [Kerckhoffs's
+   principle](https://en.wikipedia.org/wiki/Kerckhoffs%27s_principle),
    suppose that the adversary knows that you generate your passwords using,
    say, `pwqgen random=50`.  so the attacker knows that your password has
    50 bits of entropy (but doesn't know the actual password).  your
