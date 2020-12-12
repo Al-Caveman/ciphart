@@ -37,11 +37,12 @@
                             tcgetattr, tcsetattr, write  */
 
 #define APP_NAME "ciphart"
-#define APP_VERSION "3.1.0"
+#define APP_VERSION "3.1.1"
 #define APP_YEAR "2020"
 #define APP_URL "https://github.com/Al-Caveman/ciphart"
 #define ARG_PARSE_OK 0
 #define ARG_PARSE_ERR 1
+#define FILE_MODE_PLAIN (S_IRUSR | S_IWUSR)
 #define DEV_TTY "/dev/tty"
 #define SIZE_NONCE crypto_stream_xchacha20_NONCEBYTES
 #define SIZE_HEADER crypto_secretstream_xchacha20poly1305_HEADERBYTES
@@ -108,6 +109,10 @@
 #define RETURN_FAIL_PTHREAD 6 /* pthread failure                */
 #define RETURN_FAIL_BADPASS 7 /* bad password or corrupt file   */
 #define RETURN_FAIL_BADEND  8 /* premature input file end       */
+#define CEOF_OK   0 /* ciphart_eof success */
+#define CEOF_EOF  1 /* ciphart_eof eof */
+#define CEOF_FAIL 2 /* ciphart_eof failure */
+#define CEOF_UNKNOWN 3 /* ciphart_eof failure */
 
 /* 1 = colors displayed, 0 not */
 int pretty_stdout = 0, pretty_stderr = 0;
@@ -192,17 +197,24 @@ char *ciphart_oracle(
     time_t time_start, char *time_left_desc
 );
 
+/* unbuffered chunk reader to detect end-of-file without an extra round
+ * with zery-bytes read.  this is necessary to let libsodium's encryption
+ * work peacefully, as it assumes that each encrypted chunk is of a given
+ * size, except the last one.  basically this tries to feel like feof,
+ * except for not using buffered i/o */
+int ciphart_eof(int fd, void *buf, size_t count, ssize_t *read);
+
 /* encrypt input into output */
 int ciphart_enc(
     unsigned char *key, unsigned char *header,
-    unsigned char *buf_cleartext, unsigned char *buf_ciphertext, 
+    unsigned char *buf_cleartext, unsigned char *buf_ciphertext,
     size_t chunk_clr, char *path_in, char *path_out
 );
 
 /* decrypt input into output */
 int ciphart_dec(
     unsigned char *key, unsigned char *header,
-    unsigned char *buf_cleartext, unsigned char *buf_ciphertext, 
+    unsigned char *buf_ciphertext, unsigned char *buf_cleartext,
     size_t chunk_enc, char *path_in, char *path_out
 );
 
@@ -235,7 +247,7 @@ int main(int argc, char **argv) {
     );
     if (args_r) {
         fprintf(stderr, "\ntype `%s -h` for help.\n", exec_name);
-        return args_r;
+        return RETURN_FAIL_ARGS;
     }
 
     /* show banner */
@@ -299,9 +311,9 @@ int main(int argc, char **argv) {
     /* make sure that the requested entropy is large enough to result in
      * working in the pad twice.  because twice is the smallest number that
      * the cross-tax xor-ing happens (to introduce memory hardness).
-     * 
+     *
      * this is a simplified version of the following:
-     *            pow(2, entropy) < 2.0 * pad_size / ask_size
+     *      pow(2, entropy) < 2.0 * pad_size / ask_size * task_rounds
      * except for being in log form (in order to avoid memory overflows) */
     if (entropy < log2(2.0) + log2(pad_size) - log2(task_size) \
                   + log2(task_rounds)
@@ -353,8 +365,8 @@ int main(int argc, char **argv) {
      *
      * key----------------------------------*               buf_cleartext
      * key_confirm*     ids---*             header*         buf_ciphertext
-     * buf_pass---*     args--*         
-     *                  nonces* 
+     * buf_pass---*     args--*
+     *                  nonces*
      *                  xor---*
      */
     size_t moah_phases[4];
@@ -366,7 +378,7 @@ int main(int argc, char **argv) {
                      + sizeof(uint64_t);
     moah_phases[2] = SIZE_KEY + SIZE_HEADER;
     moah_phases[3] = chunk_clr + chunk_enc;
-    size_t moah_size = 0; 
+    size_t moah_size = 0;
     int phase_id;
     for (phase_id = 0; phase_id < 4; phase_id++) {
         if (moah_phases[phase_id] > moah_size) {
@@ -389,9 +401,9 @@ int main(int argc, char **argv) {
     unsigned char *nonces = \
         (void *)args  + threads * sizeof(struct thread_arg);
     uint64_t *xor = (void *)nonces + threads * SIZE_NONCE;
-    unsigned char *header = (void *)buf_pass; /* phase 2 */
+    unsigned char *header = key_confirm; /* phase 2 */
     unsigned char *buf_cleartext = moah; /* phase 3 */
-    unsigned char *buf_ciphertext = moah + chunk_clr; /* phase 3 */
+    unsigned char *buf_ciphertext = buf_cleartext + chunk_clr;
 
     /* get key */
     int key_r = ciphart_get_key(
@@ -401,7 +413,7 @@ int main(int argc, char **argv) {
         r = key_r;
         goto fail;
     }
-    
+
     /* derive a more expensive key that's worth 'entropy' bits */
     if (flags & FLAG_K) {
         ciphart_info(
@@ -831,7 +843,7 @@ int ciphart_parse_args(
     }
 
     /* '-w' does not mix with any other action */
-    if ( 
+    if (
         *flags & FLAG_W
         && *flags & (FLAG_E | FLAG_D | FLAG_K | FLAG_C | FLAG_H)
     ) {
@@ -841,7 +853,7 @@ int ciphart_parse_args(
     }
 
     /* '-c' does not mix with any other action */
-    if ( 
+    if (
         *flags & FLAG_C
         && *flags & (FLAG_E | FLAG_D | FLAG_K | FLAG_W | FLAG_H)
     ) {
@@ -851,12 +863,18 @@ int ciphart_parse_args(
     }
 
     /* '-h' does not mix with any other action */
-    if ( 
+    if (
         *flags & FLAG_H
         && *flags & (FLAG_E | FLAG_D | FLAG_K | FLAG_W | FLAG_C)
     ) {
         ciphart_err(
             "action '-h' does not mix with others.");
+        arg_parse_err = ARG_PARSE_ERR;
+    }
+
+    /* make sure input and output paths are not the same file */
+    if (strcmp(*path_in, "-") != 0 && strcmp(*path_in, *path_out) == 0) {
+        ciphart_err("input and output paths cannot be the same file.");
         arg_parse_err = ARG_PARSE_ERR;
     }
 
@@ -870,21 +888,6 @@ int ciphart_get_key(
     unsigned char *key_confirm, int pass_stdin, int pass_confirm
 ) {
     int r = RETURN_FAIL;
-
-    /* disable terminal echo */
-    struct termios termios_old, termios_new;
-    if (! pass_stdin) {
-        if (tcgetattr(STDIN_FILENO, &termios_old)) {
-            ciphart_err("failed to get terminal settings.");
-            return RETURN_FAIL_IO;
-        }
-        termios_new = termios_old;
-        termios_new.c_lflag &= ~ECHO;
-        if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &termios_new)) {
-            ciphart_err("failed to disable terminal echo.");
-            return RETURN_FAIL_IO;
-        }
-    }
 
     /* should password be taken from /dev/tty?  or stdin? */
     int fd;
@@ -904,6 +907,21 @@ int ciphart_get_key(
         }
     }
 
+    /* disable terminal echo */
+    struct termios termios_old, termios_new;
+    if (! pass_stdin) {
+        if (tcgetattr(fd, &termios_old)) {
+            ciphart_err("failed to get terminal settings.");
+            return RETURN_FAIL_IO;
+        }
+        termios_new = termios_old;
+        termios_new.c_lflag &= ~ECHO;
+        if (tcsetattr(fd, TCSAFLUSH, &termios_new)) {
+            ciphart_err("failed to disable terminal echo.");
+            return RETURN_FAIL_IO;
+        }
+    }
+
     /* obtain password */
     unsigned char attempt = 0;
     unsigned char *buf_tmp;
@@ -915,8 +933,11 @@ int ciphart_get_key(
         ssize_t len;
         crypto_generichash_init(&state, NULL, 0, SIZE_KEY);
         while ((len = read(fd, buf_pass, 1)) > 0) {
-            crypto_generichash_update(&state, buf_pass, len);
-            if (pass_stdin == 0 && len && buf_pass[0] == '\n') break;
+            if (! pass_stdin && buf_pass[0] == '\n') {
+                break;
+            } else {
+                crypto_generichash_update(&state, buf_pass, len);
+            }
         }
         fprintf(stderr, "\n");
         crypto_generichash_final(&state, key, SIZE_KEY);
@@ -951,7 +972,7 @@ success:
     /* success! */
     r = RETURN_OK;
 fail:
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &termios_old)) {
+    if (! pass_stdin && tcsetattr(fd, TCSAFLUSH, &termios_old)) {
         ciphart_err("failed to re-enable terminal echo");
         r = RETURN_FAIL_IO;
     }
@@ -1038,7 +1059,7 @@ int ciphart_thread(struct thread_arg *a) {
         task_id < a->first_task_id + a->tasks;
         task_id += 2
     ) {
-        *(a->nonce + 1) = task_id; 
+        *(a->nonce + 1) = task_id;
         for (
             *round_id = 0;
             *round_id < a->task_rounds * 2;/* repeat twice since this
@@ -1242,10 +1263,32 @@ char *ciphart_oracle (
     return time_left_desc;
 }
 
+/* unbuffered chunk reader to detect end-of-file without an extra round
+ * with zery-bytes read.  this is necessary to let libsodium's encryption
+ * work peacefully, as it assumes that each encrypted chunk is of a given
+ * size, except the last one.  basically this tries to feel like feof,
+ * except for not using buffered i/o */
+int ciphart_eof(int fd, void *buf, size_t count, ssize_t *len) {
+    ssize_t in_len = read(fd, buf, count);
+    if (in_len == -1) {
+        return CEOF_FAIL;
+    } else if (in_len > 0 && (size_t)in_len == count) {
+        *len += in_len;
+        return CEOF_OK;
+    } else if (in_len == 0) {
+        return CEOF_EOF;
+    } else if (in_len > 0 && (size_t)in_len < count) {
+        *len += in_len;
+        return ciphart_eof(fd, buf + in_len, count - in_len, len);
+    } else {
+        return CEOF_UNKNOWN;
+    }
+}
+
 /* encrypt input into output */
 int ciphart_enc(
     unsigned char *key, unsigned char *header,
-    unsigned char *buf_cleartext, unsigned char *buf_ciphertext, 
+    unsigned char *buf_cleartext, unsigned char *buf_ciphertext,
     size_t chunk_clr, char *path_in, char *path_out
 ) {
     int r = RETURN_FAIL;
@@ -1287,28 +1330,37 @@ int ciphart_enc(
 
     /* encrypt */
     ssize_t in_len;
-    int eof;
     unsigned long long out_len;
-    unsigned char tag;
+    unsigned char tag = 0;
     do {
-        if ((in_len = read(fd_in, buf_cleartext, chunk_clr)) == -1) {
-            ciphart_err("failed to read input '%s'.", path_in);
-            return RETURN_FAIL_IO;
+        in_len = 0;
+        switch (ciphart_eof(fd_in, buf_cleartext, chunk_clr, &in_len)) {
+            case CEOF_OK:
+                break;
+            case CEOF_EOF:
+                tag = crypto_secretstream_xchacha20poly1305_TAG_FINAL;
+                break;
+            case CEOF_FAIL:
+                ciphart_err("failed to read input '%s'.", path_in);
+                r = RETURN_FAIL_IO;
+                goto fail;
+            case CEOF_UNKNOWN:
+                ciphart_err("mystery when reading input '%s'.", path_in);
+                r = RETURN_FAIL_IO;
+                goto fail;
         }
-        if (in_len == 0) eof = 1;
-        if (eof) tag = crypto_secretstream_xchacha20poly1305_TAG_FINAL;
         crypto_secretstream_xchacha20poly1305_push(
             &state, buf_ciphertext, &out_len, buf_cleartext, in_len,
             NULL, 0, tag
         );
         if (
-            fwrite(buf_ciphertext, 1, (size_t) out_len, fp_out) != out_len
+            fwrite(buf_ciphertext, 1, (size_t)out_len, fp_out) != out_len
         ) {
             ciphart_err("failed to fully write to '%s'", path_out);
             r = RETURN_FAIL_IO;
             goto fail;
         }
-    } while (! eof);
+    } while (! tag);
 
     /* success! */
     r = RETURN_OK;
@@ -1323,7 +1375,7 @@ fail:
 /* decrypt input into output */
 int ciphart_dec(
     unsigned char *key, unsigned char *header,
-    unsigned char *buf_cleartext, unsigned char *buf_ciphertext, 
+    unsigned char *buf_ciphertext, unsigned char *buf_cleartext,
     size_t chunk_enc, char *path_in, char *path_out
 ) {
     int r = RETURN_FAIL;
@@ -1346,10 +1398,10 @@ int ciphart_dec(
     /* get header and state */
     crypto_secretstream_xchacha20poly1305_state state;
     size_t r_fread = fread(header, 1, SIZE_HEADER, fp_in);
-    int rinit = crypto_secretstream_xchacha20poly1305_init_pull(
+    int r_init = crypto_secretstream_xchacha20poly1305_init_pull(
         &state, header, key
     );
-    if (r_fread != SIZE_HEADER || rinit != 0) {
+    if (r_fread != SIZE_HEADER || r_init != 0) {
         ciphart_err("incomplete header.");
         r = RETURN_FAIL_BADEND;
         goto fail;
@@ -1359,7 +1411,9 @@ int ciphart_dec(
     if (strcmp(path_out, "-") == 0) {
         fd_out = STDOUT_FILENO;
     } else {
-        fd_out = open(path_out, O_WRONLY);
+        fd_out = open(
+            path_out, O_WRONLY | O_CREAT | O_TRUNC, FILE_MODE_PLAIN
+        );
     }
     if (fd_out == -1) {
         ciphart_err("failed to open '%s' for write.", path_out);
@@ -1394,7 +1448,7 @@ int ciphart_dec(
             r = RETURN_FAIL_BADEND;
             goto fail;
         }
-        r_write = write(fd_out, buf_cleartext, (size_t) out_len);
+        r_write = write(fd_out, buf_cleartext, (size_t)out_len);
         if (r_write >= 0 && (unsigned long long)r_write != out_len) {
             ciphart_err("failed to fully write to '%s'", path_out);
             r = RETURN_FAIL_IO;
