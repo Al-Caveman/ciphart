@@ -56,7 +56,7 @@ test-k:
 test-edk:
 	echo "lol" | ./ciphart -zske -i tests/truth/data.clr           -o tests/current/edk/data.clr.enc
 	echo "lol" | ./ciphart -skd  -i tests/current/edk/data.clr.enc -o tests/current/edk/data.clr.enc.clr
-	diff tests/current/edk/data.clr.enc.clr tests/truth/edk/data.clr
+	diff tests/current/edk/data.clr.enc.clr tests/truth/data.clr
 
 clean:
 	rm -rf ciphart tests/current tests/truth/data.clr
