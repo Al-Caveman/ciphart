@@ -26,27 +26,9 @@ test-docs: $(APP) test-prepare
 	$(APP) -h           &> $(CUR)/docs/help.txt
 	$(APP) -w           &> $(CUR)/docs/warn.txt
 	$(APP) -w           &> $(CUR)/docs/cond.txt
-	$(APP) -h -p auto   &> $(CUR)/docs/help.pauto.txt
-	$(APP) -w -p auto   &> $(CUR)/docs/warn.pauto.txt
-	$(APP) -w -p auto   &> $(CUR)/docs/cond.pauto.txt
-	$(APP) -h -p always &> $(CUR)/docs/help.palways.txt
-	$(APP) -w -p always &> $(CUR)/docs/warn.palways.txt
-	$(APP) -w -p always &> $(CUR)/docs/cond.palways.txt
-	$(APP) -h -p never  &> $(CUR)/docs/help.pnever.txt
-	$(APP) -w -p never  &> $(CUR)/docs/warn.pnever.txt
-	$(APP) -w -p never  &> $(CUR)/docs/cond.pnever.txt
 	$(DIF) $(CUR)/docs/help.txt         $(TRU)/docs/help.txt
 	$(DIF) $(CUR)/docs/warn.txt         $(TRU)/docs/warn.txt
 	$(DIF) $(CUR)/docs/cond.txt         $(TRU)/docs/cond.txt
-	$(DIF) $(CUR)/docs/help.pauto.txt   $(TRU)/docs/help.pauto.txt
-	$(DIF) $(CUR)/docs/warn.pauto.txt   $(TRU)/docs/warn.pauto.txt
-	$(DIF) $(CUR)/docs/cond.pauto.txt   $(TRU)/docs/cond.pauto.txt
-	$(DIF) $(CUR)/docs/help.palways.txt $(TRU)/docs/help.palways.txt
-	$(DIF) $(CUR)/docs/warn.palways.txt $(TRU)/docs/warn.palways.txt
-	$(DIF) $(CUR)/docs/cond.palways.txt $(TRU)/docs/cond.palways.txt
-	$(DIF) $(CUR)/docs/help.pnever.txt  $(TRU)/docs/help.pnever.txt
-	$(DIF) $(CUR)/docs/warn.pnever.txt  $(TRU)/docs/warn.pnever.txt
-	$(DIF) $(CUR)/docs/cond.pnever.txt  $(TRU)/docs/cond.pnever.txt
 
 .PHONY: test-ed
 test-ed: $(APP) test-prepare

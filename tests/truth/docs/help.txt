@@ -1,4 +1,4 @@
-ciphart v3.1.4  copyright (C) 2020  caveman
+ciphart v3.2.0  copyright (C) 2020  caveman
 https://github.com/Al-Caveman/ciphart
 
 this program comes with ABSOLUTELY NO WARRANTY; for details
@@ -7,12 +7,12 @@ redistribute it under certain conditions; type `./ciphart -c' for
 details.
 
 SYNOPSIS
- ./ciphart -e       [-s] [-z] [-i PATH] [-o PATH] [-p COLOR]
- ./ciphart -d       [-s]      [-i PATH] [-o PATH] [-p COLOR]
- ./ciphart -k       [-s]                [-o PATH] [-p COLOR] [KDF ...]
- ./ciphart -ek      [-s] [-z] [-i PATH] [-o PATH] [-p COLOR] [KDF ...]
- ./ciphart -dk      [-s]      [-i PATH] [-o PATH] [-p COLOR] [KDF ...]
- ./ciphart -{w,c,h}                               [-p COLOR]
+ ./ciphart -e                 [-i PATH] [-o PATH] [-s] [-z] [-v]
+ ./ciphart -d                 [-i PATH] [-o PATH] [-s]      [-v]
+ ./ciphart -k       [KDF ...]           [-o PATH] [-s]      [-v]
+ ./ciphart -ek      [KDF ...] [-i PATH] [-o PATH] [-s] [-z] [-v]
+ ./ciphart -dk      [KDF ...] [-i PATH] [-o PATH] [-s]      [-v]
+ ./ciphart -{w,c,h}
 
 ACTIONS
  -e        only encrypt input plaintext into output ciphertext.
@@ -25,11 +25,11 @@ ACTIONS
  -h        show this help.
 
 OPTIONS
- -s        read passwords via STDIN.
- -z        disable password confirmation.
  -i PATH   path to input file.  default is '-' for STDIN.
  -o PATH   path to output file.  default is '-' for STDOUT.
- -p COLOR  when to show pretty colors.  default is 'auto'.
+ -s        read passwords via STDIN.
+ -z        disable password confirmation.
+ -v        enable verbose output.
 
 KDF
  -m INT    size of memory pad.  default is '999997440'.
@@ -42,7 +42,6 @@ VALUES
  PATH      file path.  '-' means STDIN or STDOUT.
  INT       positive integer.
  REAL      positive real number.
- COLOR     one of:  'auto', 'always' or 'never'.
 
 RETURN CODES
  0         success.

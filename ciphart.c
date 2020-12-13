@@ -37,7 +37,7 @@
                             tcgetattr, tcsetattr, write  */
 
 #define APP_NAME "ciphart"
-#define APP_VERSION "3.1.4"
+#define APP_VERSION "3.2.0"
 #define APP_YEAR "2020"
 #define APP_URL "https://github.com/Al-Caveman/ciphart"
 #define ARG_PARSE_OK 0
@@ -55,36 +55,23 @@
 #define DFLT_ENTRPY 20.0
 #define DFLT_THREADS 4 /* number of threads */
 #define ENTRPY_MAX 64.0
-#define COLOR_HEADING "\033[1;37m"
-#define COLOR_NOTE "\033[0;90m"
-#define COLOR_BAR "\033[1;90m"
-#define COLOR_BANNER "\033[0;90m"
-#define COLOR_ERR "\033[1;31m"
-#define COLOR_WARN "\033[1;33m"
-#define COLOR_INFO "\033[1;32m"
-#define COLOR_PROMPT "\033[1;34m"
-#define COLOR_PROMPT_TEXT "\033[0;34m"
-#define COLOR_RESET "\033[0m"
-#define PRETTY_AUTO     "auto"
-#define PRETTY_ALWAYS   "always"
-#define PRETTY_NEVER    "never"
 #define UI_UPDATE_THRESHOLD 100000llu
-#define FLAG_E  1
-#define FLAG_D  2
-#define FLAG_K  4
-#define FLAG_W  8
-#define FLAG_C  16
-#define FLAG_H  32
-#define FLAG_S  64
-#define FLAG_Z  128
-#define FLAG_I  256
-#define FLAG_O  512
-#define FLAG_M  1024
-#define FLAG_T  2048
-#define FLAG_R  4096
-#define FLAG_N  8192
-#define FLAG_J  16384
-#define FLAG_P  32768
+#define FLAG_E  1       /* encrypt */
+#define FLAG_D  2       /* decrypt */
+#define FLAG_K  4       /* dereive new key */
+#define FLAG_W  8       /* show warning */
+#define FLAG_C  16      /* show conditions */
+#define FLAG_H  32      /* show help */
+#define FLAG_S  64      /* get password from stdin */
+#define FLAG_Z  128     /* disable password confirmation */
+#define FLAG_I  256     /* input path */
+#define FLAG_O  512     /* output path */
+#define FLAG_M  1024    /* memory pad's size */
+#define FLAG_T  2048    /* teach task's size in the pad */
+#define FLAG_R  4096    /* number of rounds in each task */
+#define FLAG_N  8192    /* number of entropy bits */
+#define FLAG_J  16384   /* number of worker threads */
+#define FLAG_V  32768   /* enable verbose output mode */
 #define TIME_LEFT_DESC_SIZE 500 /* number of characters */
 #define RETURN_OK           0 /* maybe no problem               */
 #define RETURN_FAIL         1 /* a problem                      */
@@ -100,8 +87,8 @@
 #define CEOF_FAIL 2 /* ciphart_eof failure */
 #define CEOF_UNKNOWN 3 /* ciphart_eof failure */
 
-/* 1 = colors displayed, 0 not */
-int pretty_stdout = 0, pretty_stderr = 0;
+/* 1 = verbose, 0 not */
+int verbose = 0;
 
 /* print error */
 void ciphart_err(const char *fmt, ...);
@@ -114,9 +101,6 @@ void ciphart_info(const char *fmt, ...);
 
 /* print prompt */
 void ciphart_prompt(const char *fmt, ...);
-
-/* print status bar */
-void ciphart_bar(const char *fmt, ...);
 
 /* print banner */
 void ciphart_banner(char *exec_name);
@@ -211,8 +195,6 @@ int main(int argc, char **argv) {
     char *exec_name = argv[0];
 
     /* assign default values */
-    if (isatty(STDOUT_FILENO)) pretty_stdout = 1;
-    if (isatty(STDERR_FILENO)) pretty_stderr = 1;
     int pass_stdin = 0;
     int pass_confirm = 1;
     char *path_in = DFLT_PATH_IN;
@@ -236,39 +218,28 @@ int main(int argc, char **argv) {
         return RETURN_FAIL_ARGS;
     }
 
-    /* show banner */
-    ciphart_banner(exec_name);
-
-    /* define action description, and do the easy actions */
-    const char *act_desc = "";
-    if (flags & FLAG_E && flags & FLAG_K) {
-        act_desc = "derive a better key, then encrypt with it";
-    } else if (flags & FLAG_D && flags & FLAG_K) {
-        act_desc = "derive a better key, then decrypt with it";
-    } else if (flags & FLAG_E) {
-        act_desc = "only encrypt, without deriving a better key";
-    } else if (flags & FLAG_D) {
-        act_desc = "only decrypt, without deriving a better key";
-    } else if (flags & FLAG_K) {
-        act_desc = "only derive a better key, then exit";
+    /* do the easy actions */
+    if (flags & FLAG_K && ! (flags & (FLAG_E | FLAG_D))) {
         ciphart_warn(
-            "note: entropy is calculated based on:\n\n"
-            "       - encryption/decryption using xchacha20.\n"
-            "       - %llu bytes key size.\n"
-            "       - %llu chunk size (set by '-t').\n\n"
+            "entropy is calculated based on:\n\n"
+            "      - encryption/decryption using xchacha20.\n"
+            "      - %llu bytes key size.\n"
+            "      - %llu chunk size (set by '-t').\n\n"
 
-            "    while using other methods will still limit risk of\n"
-            "    brute-forcing, the meaning of the calculated entropy\n"
-            "    bits won't be guaranteed to be true.\n\n"
+            "   while using other methods will still limit risk of\n"
+            "   brute-forcing, the meaning of the calculated entropy\n"
+            "   bits won't be guaranteed to be true.\n\n"
 
-            "    this is not an algorithmic limitation, but purely an\n"
-            "    implementation one as i didn't find a need to support\n"
-            "    other methods than the one stated above.\n",
+            "   this is not an algorithmic limitation, but purely an\n"
+            "   implementation one as i didn't find a need to support\n"
+            "   other methods than the one stated above.\n",
         SIZE_KEY, task_size);
     } else if (flags & FLAG_W) {
+        ciphart_banner(exec_name);
         ciphart_fputs(WARRANTY);
         return RETURN_OK;
     } else if (flags & FLAG_C) {
+        ciphart_banner(exec_name);
         ciphart_fputs(CONDITIONS);
         ciphart_fputs(CONDITIONS_1);
         ciphart_fputs(CONDITIONS_2);
@@ -290,6 +261,7 @@ int main(int argc, char **argv) {
         ciphart_fputs(CONDITIONS_17);
         return RETURN_OK;
     } else if (flags & FLAG_H) {
+        ciphart_banner(exec_name);
         ciphart_help(exec_name);
         return RETURN_OK;
     }
@@ -332,23 +304,10 @@ int main(int argc, char **argv) {
     }
 
     /* print settings' summary */
-    char *color = "", *color_reset = "";
-    if (pretty_stderr) {
-        color = COLOR_NOTE;
-        color_reset = COLOR_RESET;
-    }
-    ciphart_info("action:  %s.", act_desc);
     if (flags & FLAG_K) {
         ciphart_info(
-            "summary of parameters of the key drivation function:\n"
-            "    -m%10zu"   "  %s# pad's memory size.%s\n"
-            "    -t%10zd"   "  %s# tasks' size in the pad.%s\n"
-            "    -r%10llu"  "  %s# rounds per task.%s\n"
-            "    -n%10.6lf" "  %s# entropy-worth difficulty to add.%s",
-            pad_size,    color, color_reset,
-            task_size,   color, color_reset,
-            task_rounds, color, color_reset,
-            entropy,     color, color_reset
+            "key derivation's settings: -m%zu -t%zd -r%llu -n%lf",
+            pad_size, task_size, task_rounds, entropy
         );
     }
 
@@ -498,12 +457,7 @@ fail:
 
 /* print error */
 void ciphart_err(const char *fmt, ...) {
-    char *color = "", *color_reset = "";
-    if (pretty_stderr) {
-        color = COLOR_ERR;
-        color_reset = COLOR_RESET;
-    }
-    fprintf(stderr,"%s!!!%s ", color , color_reset);
+    fprintf(stderr,"ERROR: ");
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
@@ -513,12 +467,8 @@ void ciphart_err(const char *fmt, ...) {
 
 /* print warning */
 void ciphart_warn(const char *fmt, ...) {
-    char *color = "", *color_reset = "";
-    if (pretty_stderr) {
-        color = COLOR_WARN;
-        color_reset = COLOR_RESET;
-    }
-    fprintf(stderr,"%s***%s ", color, color_reset);
+    if (! verbose) return;
+    fprintf(stderr,"WARNIG: ");
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
@@ -528,12 +478,7 @@ void ciphart_warn(const char *fmt, ...) {
 
 /* print info */
 void ciphart_info(const char *fmt, ...) {
-    char *color = "", *color_reset = "";
-    if (pretty_stderr) {
-        color = COLOR_INFO;
-        color_reset = COLOR_RESET;
-    }
-    fprintf(stderr,"%s>>>%s ", color, color_reset);
+    if (! verbose) return;
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
@@ -543,28 +488,6 @@ void ciphart_info(const char *fmt, ...) {
 
 /* print prompt */
 void ciphart_prompt(const char *fmt, ...) {
-    char *color = "", *color_text = "", *color_reset = "";
-    if (pretty_stderr) {
-        color = COLOR_PROMPT;
-        color_text = COLOR_PROMPT_TEXT;
-        color_reset = COLOR_RESET;
-    }
-    fprintf(stderr,"%s<<<%s ", color, color_text);
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-    fprintf(stderr,"%s", color_reset);
-}
-
-/* print status bar */
-void ciphart_bar(const char *fmt, ...) {
-    char *color = "", *color_reset = "";
-    if (pretty_stderr) {
-        color = COLOR_BAR;
-        color_reset = COLOR_RESET;
-    }
-    fprintf(stderr,"\r%s>>>%s ", color, color_reset);
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
@@ -573,42 +496,32 @@ void ciphart_bar(const char *fmt, ...) {
 
 /* print banner */
 void ciphart_banner(char *exec_name) {
-    char *color = "", *color_reset = "";
-    if (pretty_stderr) {
-        color = COLOR_BANNER;
-        color_reset = COLOR_RESET;
-    }
     fprintf(
-        stderr,
-        "%s%s v%s  copyright (C) %s  caveman\n"
+        stdout,
+        "%s v%s  copyright (C) %s  caveman\n"
         "%s\n\n"
         "this program comes with ABSOLUTELY NO WARRANTY; for details\n"
         "type `%s -w'.  this is free software, and you are welcome to\n"
         "redistribute it under certain conditions; type `%s -c' for\n"
-        "details.%s\n\n",
-        color, APP_NAME, APP_VERSION, APP_YEAR, APP_URL, exec_name,
-        exec_name, color_reset
+        "details.\n\n",
+        APP_NAME, APP_VERSION, APP_YEAR, APP_URL, exec_name,
+        exec_name
     );
 }
 
 /* print help */
 void ciphart_help(char *exec_name) {
-    char *color = "", *color_reset = "";
-    if (pretty_stdout) {
-        color = COLOR_HEADING;
-        color_reset = COLOR_RESET;
-    }
     fprintf(
         stdout,
-        "%sSYNOPSIS%s\n"
-        " %s -e       [-s] [-z] [-i PATH] [-o PATH] [-p COLOR]\n"
-        " %s -d       [-s]      [-i PATH] [-o PATH] [-p COLOR]\n"
-        " %s -k       [-s]                [-o PATH] [-p COLOR] [KDF ...]\n"
-        " %s -ek      [-s] [-z] [-i PATH] [-o PATH] [-p COLOR] [KDF ...]\n"
-        " %s -dk      [-s]      [-i PATH] [-o PATH] [-p COLOR] [KDF ...]\n"
-        " %s -{w,c,h}                               [-p COLOR]\n\n"
+        "SYNOPSIS\n"
+        " %s -e                 [-i PATH] [-o PATH] [-s] [-z] [-v]\n"
+        " %s -d                 [-i PATH] [-o PATH] [-s]      [-v]\n"
+        " %s -k       [KDF ...]           [-o PATH] [-s]      [-v]\n"
+        " %s -ek      [KDF ...] [-i PATH] [-o PATH] [-s] [-z] [-v]\n"
+        " %s -dk      [KDF ...] [-i PATH] [-o PATH] [-s]      [-v]\n"
+        " %s -{w,c,h}\n\n"
 
-        "%sACTIONS%s\n"
+        "ACTIONS\n"
         " -e        only encrypt input plaintext into output ciphertext.\n"
         " -d        only decrypt input ciphertext into output plaintext.\n"
         " -k        only derive a more secure key.\n"
@@ -618,27 +531,26 @@ void ciphart_help(char *exec_name) {
         " -c        show usage conditions.\n"
         " -h        show this help.\n\n"
 
-        "%sOPTIONS%s\n"
-        " -s        read passwords via STDIN.\n"
-        " -z        disable password confirmation.\n"
+        "OPTIONS\n"
         " -i PATH   path to input file.  default is '-' for STDIN.\n"
         " -o PATH   path to output file.  default is '-' for STDOUT.\n"
-        " -p COLOR  when to show pretty colors.  default is '%s'.\n\n"
+        " -s        read passwords via STDIN.\n"
+        " -z        disable password confirmation.\n"
+        " -v        enable verbose output.\n\n"
 
-        "%sKDF%s\n"
+        "KDF\n"
         " -m INT    size of memory pad.  default is '%lu'.\n"
         " -t INT    bytes of each task in the pad.  default is '%lu'.\n"
         " -r INT    repetition in each task.  default is '%llu'.\n"
         " -n REAL   entropy bits.  default is '%.2f'.\n"
         " -j INT    number of concurrent threads.  default is '%d'.\n\n"
 
-        "%sVALUES%s\n"
+        "VALUES\n"
         " PATH      file path.  '-' means STDIN or STDOUT.\n"
         " INT       positive integer.\n"
-        " REAL      positive real number.\n"
-        " COLOR     one of:  '%s', '%s' or '%s'.\n\n"
+        " REAL      positive real number.\n\n"
 
-        "%sRETURN CODES%s\n"
+        "RETURN CODES\n"
         " %d         success.\n"
         " %d         general failure.\n"
         " %d         libsodium failure.\n"
@@ -648,17 +560,15 @@ void ciphart_help(char *exec_name) {
         " %d         pthread feailure.\n"
         " %d         bad password or corrupted input.\n"
         " %d         premature input end.\n",
-        color, color_reset, /* synopsis */
+        /* synopsis */
         exec_name, exec_name, exec_name, exec_name, exec_name, exec_name,
-        color, color_reset, /* actions */
-        color, color_reset, /* options */
-        PRETTY_AUTO,
-        color, color_reset, /* kdf */
+        /* actions */
+        /* options */
+        /* kdf */
         DFLT_PAD_SIZE, DFLT_TASK_SIZE, DFLT_TASK_ROUNDS, DFLT_ENTRPY,
         DFLT_THREADS,
-        color, color_reset, /* values */
-        PRETTY_AUTO, PRETTY_ALWAYS, PRETTY_NEVER,
-        color, color_reset, /* return codes */
+        /* values */
+        /* return codes */
         RETURN_OK, RETURN_FAIL, RETURN_FAIL_SODIUM,
         RETURN_FAIL_ARGS, RETURN_FAIL_IO, RETURN_FAIL_MEM,
         RETURN_FAIL_PTHREAD, RETURN_FAIL_BADPASS, RETURN_FAIL_BADEND
@@ -683,7 +593,7 @@ int ciphart_parse_args(
 ) {
     int arg_parse_err = ARG_PARSE_OK, opt;
     while ((opt = getopt(
-        argc, argv, "-:eEdDkKwchi:o:m:t:r:n:j:p:sz"
+        argc, argv, "-:eEdDkKwchi:o:m:t:r:n:j:szv"
     )) != -1) {
         switch (opt) {
             /* actions */
@@ -754,21 +664,9 @@ int ciphart_parse_args(
                 )) arg_parse_err = ARG_PARSE_ERR;
                 *flags |= FLAG_J;
                 break;
-            case 'p': /* pretty colors mode */
-                if (strcmp(optarg, PRETTY_AUTO) == 0) {
-                    /* disable colors for when stdout/stderr is not a
-                     * terminal.  this is already done earlier, so no need
-                     * to do it here again */
-                } else if (strcmp(optarg, PRETTY_ALWAYS) == 0) {
-                    pretty_stdout = 1;
-                    pretty_stderr = 1;
-                } else if (strcmp(optarg, PRETTY_NEVER) == 0) {
-                    pretty_stdout = 0;
-                    pretty_stderr = 0;
-                } else {
-                    ciphart_err("'%s' is invalid color mode.", optarg);
-                }
-                *flags |= FLAG_P;
+            case 'v': /* verbose mode */
+                verbose = 1;
+                *flags |= FLAG_V;
                 break;
 
             /* getopt's errors */
@@ -822,6 +720,13 @@ int ciphart_parse_args(
     if (*flags & FLAG_Z && ! (*flags & FLAG_E)) {
         ciphart_err(
             "option '-z' is valid only with '-e' or '-ek'.");
+        arg_parse_err = ARG_PARSE_ERR;
+    }
+
+    /* '-z' is invalid for help/warn/cond */
+    if (*flags & FLAG_V && (*flags & (FLAG_H | FLAG_W | FLAG_C))) {
+        ciphart_err(
+            "option '-v' is invalid for '-h', '-w' and '-w'.");
         arg_parse_err = ARG_PARSE_ERR;
     }
 
@@ -898,8 +803,8 @@ int ciphart_get_key(
     char *prompts[2];
     if (pass_stdin) {
         fd = STDIN_FILENO;
-        prompts[0] = "reading password from STDIN (end by EOF): ";
-        prompts[1] = "confirming password from STDIN (end by EOF): ";
+        prompts[0] = "reading password from STDIN (end by EOF)...";
+        prompts[1] = "confirming password from STDIN (end by EOF)...";
     } else {
         fd = open(DEV_TTY, O_RDONLY);
         prompts[0] = "password: ";
@@ -1198,7 +1103,7 @@ int ciphart_complicate (
         ui_update += tasks * task_rounds;
         if (ui_update > UI_UPDATE_THRESHOLD) {
             ui_update = 0;
-            ciphart_bar(
+            ciphart_info(
                 "added %f bits worth of difficulty.  %s left...",
                 log2((pad_id + 1) * tasks * task_rounds),
                 ciphart_oracle(
@@ -1295,6 +1200,7 @@ int ciphart_enc(
     /* open input path for read */
     if (strcmp(path_in, "-") == 0) {
         fd_in = STDIN_FILENO;
+        ciphart_prompt("reading input from STDIN (end by EOF)...");
     } else {
         fd_in = open(path_in, O_RDONLY);
     }
@@ -1382,6 +1288,7 @@ int ciphart_dec(
     /* open input path for read */
     if (strcmp(path_in, "-") == 0) {
         fp_in = stdin;
+        ciphart_prompt("reading input from STDIN (end by EOF)...");
     } else {
         fp_in = fopen(path_in, "r");
     }

@@ -24,16 +24,6 @@ here is why:
 - **made for humans:** neat command-line interface that allows to accept
   both, the password and the input file via STDIN; something not possible
   with some tools such as [`scrypt`](https://www.tarsnap.com/scrypt.html).
-- **made with _love_:** _looks_ very beautiful.  most likely it is _the_
-  most beautiful crypo cli app out there.
-
-<p align="center">
-    <img src="pics/1.png">
-</p>
-
-<p align="center">
-    <img src="pics/2.png">
-</p>
 
 # installation
 
