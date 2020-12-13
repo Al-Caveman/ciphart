@@ -9,7 +9,7 @@ PAS=echo "testing password 123 let me in!"
 
 all: ${APP}
 
-${APP}:
+${APP}: ${APP}.c
 	$(CC) ${APP}.c -o ${APP} -lsodium -lm -pthread $(CFLAGS)
 
 test: test-prepare test-docs test-ed test-k test-edk
