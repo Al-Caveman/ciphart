@@ -1,62 +1,70 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -march=native -mtune=native -O2 -std=c99 -pedantic
 
-all:
-	$(CC) ciphart.c -o ciphart -lsodium -lm -pthread $(CFLAGS)
+APP=./ciphart
+TRU=tests/truth
+CUR=tests/current
+DIF=diff --color=always -u
+PAS=echo "testing password 123 let me in!"
 
-test:  test-prepare test-docs test-ed test-k test-edk
+all: ${APP}
+
+${APP}:
+	$(CC) ${APP}.c -o ${APP} -lsodium -lm -pthread $(CFLAGS)
+
+test: test-prepare test-docs test-ed test-k test-edk
 
 test-prepare:
-	mkdir -p tests/current/{docs,ed,k,edk}
-	dd count=100000 if=/dev/urandom of=tests/truth/data.clr
+	mkdir -p ${CUR}/{docs,ed,k,edk}
+	dd count=100000 if=/dev/urandom of=${TRU}/data.clr
 
-test-docs:
-	./ciphart -h           &> tests/current/docs/help.txt
-	./ciphart -w           &> tests/current/docs/warn.txt
-	./ciphart -w           &> tests/current/docs/cond.txt
-	./ciphart -h -p auto   &> tests/current/docs/help.pauto.txt
-	./ciphart -w -p auto   &> tests/current/docs/warn.pauto.txt
-	./ciphart -w -p auto   &> tests/current/docs/cond.pauto.txt
-	./ciphart -h -p always &> tests/current/docs/help.palways.txt
-	./ciphart -w -p always &> tests/current/docs/warn.palways.txt
-	./ciphart -w -p always &> tests/current/docs/cond.palways.txt
-	./ciphart -h -p never  &> tests/current/docs/help.pnever.txt
-	./ciphart -w -p never  &> tests/current/docs/warn.pnever.txt
-	./ciphart -w -p never  &> tests/current/docs/cond.pnever.txt
-	diff tests/current/docs/help.txt         tests/truth/docs/help.txt
-	diff tests/current/docs/warn.txt         tests/truth/docs/warn.txt
-	diff tests/current/docs/cond.txt         tests/truth/docs/cond.txt
-	diff tests/current/docs/help.pauto.txt   tests/truth/docs/help.pauto.txt
-	diff tests/current/docs/warn.pauto.txt   tests/truth/docs/warn.pauto.txt
-	diff tests/current/docs/cond.pauto.txt   tests/truth/docs/cond.pauto.txt
-	diff tests/current/docs/help.palways.txt tests/truth/docs/help.palways.txt
-	diff tests/current/docs/warn.palways.txt tests/truth/docs/warn.palways.txt
-	diff tests/current/docs/cond.palways.txt tests/truth/docs/cond.palways.txt
-	diff tests/current/docs/help.pnever.txt  tests/truth/docs/help.pnever.txt
-	diff tests/current/docs/warn.pnever.txt  tests/truth/docs/warn.pnever.txt
-	diff tests/current/docs/cond.pnever.txt  tests/truth/docs/cond.pnever.txt
+test-docs: ${APP} test-prepare
+	${APP} -h           &> ${CUR}/docs/help.txt
+	${APP} -w           &> ${CUR}/docs/warn.txt
+	${APP} -w           &> ${CUR}/docs/cond.txt
+	${APP} -h -p auto   &> ${CUR}/docs/help.pauto.txt
+	${APP} -w -p auto   &> ${CUR}/docs/warn.pauto.txt
+	${APP} -w -p auto   &> ${CUR}/docs/cond.pauto.txt
+	${APP} -h -p always &> ${CUR}/docs/help.palways.txt
+	${APP} -w -p always &> ${CUR}/docs/warn.palways.txt
+	${APP} -w -p always &> ${CUR}/docs/cond.palways.txt
+	${APP} -h -p never  &> ${CUR}/docs/help.pnever.txt
+	${APP} -w -p never  &> ${CUR}/docs/warn.pnever.txt
+	${APP} -w -p never  &> ${CUR}/docs/cond.pnever.txt
+	${DIF} ${CUR}/docs/help.txt         ${TRU}/docs/help.txt
+	${DIF} ${CUR}/docs/warn.txt         ${TRU}/docs/warn.txt
+	${DIF} ${CUR}/docs/cond.txt         ${TRU}/docs/cond.txt
+	${DIF} ${CUR}/docs/help.pauto.txt   ${TRU}/docs/help.pauto.txt
+	${DIF} ${CUR}/docs/warn.pauto.txt   ${TRU}/docs/warn.pauto.txt
+	${DIF} ${CUR}/docs/cond.pauto.txt   ${TRU}/docs/cond.pauto.txt
+	${DIF} ${CUR}/docs/help.palways.txt ${TRU}/docs/help.palways.txt
+	${DIF} ${CUR}/docs/warn.palways.txt ${TRU}/docs/warn.palways.txt
+	${DIF} ${CUR}/docs/cond.palways.txt ${TRU}/docs/cond.palways.txt
+	${DIF} ${CUR}/docs/help.pnever.txt  ${TRU}/docs/help.pnever.txt
+	${DIF} ${CUR}/docs/warn.pnever.txt  ${TRU}/docs/warn.pnever.txt
+	${DIF} ${CUR}/docs/cond.pnever.txt  ${TRU}/docs/cond.pnever.txt
 
-test-ed:
-	echo "lol" | ./ciphart -zse -i tests/truth/data.clr          -o tests/current/ed/data.clr.enc
-	echo "lol" | ./ciphart -sd  -i tests/current/ed/data.clr.enc -o tests/current/ed/data.clr.enc.clr
-	diff tests/current/ed/data.clr.enc.clr tests/truth/data.clr
+test-ed: ${APP} test-prepare
+	${PAS} | ${APP} -zse -i ${TRU}/data.clr        -o ${CUR}/ed/data.clr.enc
+	${PAS} | ${APP} -sd  -i ${CUR}/ed/data.clr.enc -o ${CUR}/ed/data.clr.enc.clr
+	${DIF} ${CUR}/ed/data.clr.enc.clr ${TRU}/data.clr
 
-test-k:
-	echo "lol" | ./ciphart -sk       -o tests/current/k/key
-	echo "lol" | ./ciphart -sk -j 1  -o tests/current/k/key.j1
-	echo "lol" | ./ciphart -sk -j 3  -o tests/current/k/key.j3
-	echo "lol" | ./ciphart -sk -j 30 -o tests/current/k/key.j30
-	echo "lol" | ./ciphart -skt8 -m16 -r100 -n24.5 -j5 -o tests/current/k/key.t8.m16.r100.n24.5.j5
-	diff tests/current/k/key                      tests/truth/k/key
-	diff tests/current/k/key.j1                   tests/truth/k/key.j1
-	diff tests/current/k/key.j3                   tests/truth/k/key.j3
-	diff tests/current/k/key.j30                  tests/truth/k/key.j30
-	diff tests/current/k/key.t8.m16.r100.n24.5.j5 tests/truth/k/key.t8.m16.r100.n24.5.j5
+test-k: ${APP} test-prepare
+	${PAS} | ${APP} -sk       -o ${CUR}/k/key
+	${PAS} | ${APP} -sk -j 1  -o ${CUR}/k/key.j1
+	${PAS} | ${APP} -sk -j 3  -o ${CUR}/k/key.j3
+	${PAS} | ${APP} -sk -j 30 -o ${CUR}/k/key.j30
+	${PAS} | ${APP} -skt8 -m16 -r100 -n24.5 -j5 -o ${CUR}/k/key.t8.m16.r100.n24.5.j5
+	${DIF} ${CUR}/k/key                      ${TRU}/k/key
+	${DIF} ${CUR}/k/key.j1                   ${TRU}/k/key.j1
+	${DIF} ${CUR}/k/key.j3                   ${TRU}/k/key.j3
+	${DIF} ${CUR}/k/key.j30                  ${TRU}/k/key.j30
+	${DIF} ${CUR}/k/key.t8.m16.r100.n24.5.j5 ${TRU}/k/key.t8.m16.r100.n24.5.j5
 
-test-edk:
-	echo "lol" | ./ciphart -zske -i tests/truth/data.clr           -o tests/current/edk/data.clr.enc
-	echo "lol" | ./ciphart -skd  -i tests/current/edk/data.clr.enc -o tests/current/edk/data.clr.enc.clr
-	diff tests/current/edk/data.clr.enc.clr tests/truth/data.clr
+test-edk: ${APP} test-prepare
+	${PAS} | ${APP} -zske -i ${TRU}/data.clr           -o ${CUR}/edk/data.clr.enc
+	${PAS} | ${APP} -skd  -i ${CUR}/edk/data.clr.enc -o ${CUR}/edk/data.clr.enc.clr
+	${DIF} ${CUR}/edk/data.clr.enc.clr ${TRU}/data.clr
 
 clean:
-	rm -rf ciphart tests/current tests/truth/data.clr
+	rm -rf ${APP} ${CUR} ${TRU}/data.clr
