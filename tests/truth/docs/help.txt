@@ -1,4 +1,4 @@
-ciphart v3.2.0  copyright (C) 2020  caveman
+ciphart v4.0.0  copyright (C) 2020  caveman
 https://github.com/Al-Caveman/ciphart
 
 this program comes with ABSOLUTELY NO WARRANTY; for details
@@ -32,16 +32,15 @@ OPTIONS
  -v        enable verbose output.
 
 KDF
- -m INT    size of memory pad.  default is '999997440'.
- -t INT    bytes of each task in the pad.  default is '4096'.
- -r INT    repetition in each task.  default is '1'.
- -n REAL   entropy bits.  default is '20.00'.
- -j INT    number of concurrent threads.  default is '4'.
+ -m NUM    size of memory pad.  default is '999997440'.
+ -t NUM    bytes of each task in the pad.  default is '4096'.
+ -r NUM    repetition in each task.  default is '1'.
+ -n NUM    entropy bits.  default is '20'.
+ -j NUM    number of concurrent threads.  default is '4'.
 
 VALUES
  PATH      file path.  '-' means STDIN or STDOUT.
- INT       positive integer.
- REAL      positive real number.
+ NUM       positive integer.
 
 RETURN CODES
  0         success.

@@ -20,7 +20,8 @@
 #include "license.h"    /* WARRANTY, CONDITIONS */
 #include <errno.h>      /* errno */
 #include <fcntl.h>      /* open */
-#include <math.h>       /* pow, log2 */
+#include <inttypes.h>   /* PRIu64, UINT64_C */
+#include <math.h>       /* log2 */
 #include <pthread.h>    /* pthread_* */
 #include <sodium.h>     /* crypto_*, sodium_* */
 #include <stdarg.h>     /* va_* */
@@ -37,7 +38,7 @@
                             tcgetattr, tcsetattr, write  */
 
 #define APP_NAME "ciphart"
-#define APP_VERSION "3.2.0"
+#define APP_VERSION "4.0.0"
 #define APP_YEAR "2020"
 #define APP_URL "https://github.com/Al-Caveman/ciphart"
 #define ARG_PARSE_OK 0
@@ -49,13 +50,13 @@
 #define SIZE_KEY crypto_secretstream_xchacha20poly1305_KEYBYTES
 #define DFLT_PATH_IN "-"
 #define DFLT_PATH_OUT "-"
-#define DFLT_PAD_SIZE 999997440lu /* bytes for the whole memory pad */
-#define DFLT_TASK_SIZE 4096lu /* bytes per task in the memory pad */
-#define DFLT_TASK_ROUNDS 1llu /* rounds per task */
-#define DFLT_ENTRPY 20.0
+#define DFLT_PAD_SIZE 999997440llu /* bytes for the whole memory pad */
+#define DFLT_TASK_SIZE 4096llu /* bytes per task in the memory pad */
+#define DFLT_TASK_ROUNDS UINT64_C(1) /* rounds per task */
+#define DFLT_ENTRPY 20
 #define DFLT_THREADS 4 /* number of threads */
-#define ENTRPY_MAX 64.0
-#define UI_UPDATE_THRESHOLD 100000llu
+#define ENTRPY_MAX 63
+#define UI_UPDATE_THRESHOLD 100000
 #define FLAG_E  1       /* encrypt */
 #define FLAG_D  2       /* decrypt */
 #define FLAG_K  4       /* dereive new key */
@@ -99,9 +100,6 @@ void ciphart_warn(const char *fmt, ...);
 /* print info */
 void ciphart_info(const char *fmt, ...);
 
-/* print prompt */
-void ciphart_prompt(const char *fmt, ...);
-
 /* print banner */
 void ciphart_banner(char *exec_name);
 
@@ -116,21 +114,24 @@ int ciphart_parse_args(
     int argc, char **argv, int *flags,
     int *pass_stdin, int *pass_confirm, char **path_in, char **path_out,
     size_t *pad_size, size_t *task_size, uint64_t *task_rounds,
-    double *entropy, size_t *threads
+    int *entropy, size_t *threads
 );
 
 /* obtain key from password from STDIN */
 int ciphart_get_key(
     int flags,
     unsigned char *buf_pass, unsigned char *key,
+    crypto_generichash_state *state,
     unsigned char *key_confirm, int pass_stdin, int pass_confirm
 );
 
 /* convert strings into numbers within range */
 int ciphart_str2size_t(
-    const char *s, size_t min, size_t max, size_t *out);
+    char f, const char *s, size_t min, size_t max, size_t *out);
 int ciphart_str2uint64_t(
-    const char *s, uint64_t min, uint64_t max, uint64_t *out);
+    char f, const char *s, size_t min, size_t max, size_t *out);
+int ciphart_str2int(
+    char f, const char *s, int min, int max, int *out);
 int ciphart_str2double(
     const char *s, double min, double max, double *out);
 
@@ -153,11 +154,10 @@ struct thread_arg {
 void *ciphart_thread(void *arg);
 
 /* derive a more expensive key */
-int ciphart_complicate (
-    double entropy, size_t pad_size, size_t task_size,
-    uint64_t task_rounds, size_t threads,
-    unsigned char *key, pthread_t *ids,
-    struct thread_arg *a,
+int ciphart_complicate(
+    size_t pad_size, size_t task_size,
+    uint64_t pads, uint64_t task_rounds, size_t threads,
+    unsigned char *key, pthread_t *ids, struct thread_arg *a,
     unsigned char *nonces, uint64_t *xor
 );
 
@@ -177,6 +177,7 @@ int ciphart_eof(int fd, unsigned char *buf, size_t count, ssize_t *read);
 /* encrypt input into output */
 int ciphart_enc(
     unsigned char *key, unsigned char *header,
+    crypto_secretstream_xchacha20poly1305_state *state,
     unsigned char *buf_cleartext, unsigned char *buf_ciphertext,
     size_t chunk_clr, char *path_in, char *path_out
 );
@@ -184,6 +185,7 @@ int ciphart_enc(
 /* decrypt input into output */
 int ciphart_dec(
     unsigned char *key, unsigned char *header,
+    crypto_secretstream_xchacha20poly1305_state *state,
     unsigned char *buf_ciphertext, unsigned char *buf_cleartext,
     size_t chunk_enc, char *path_in, char *path_out
 );
@@ -202,7 +204,7 @@ int main(int argc, char **argv) {
     size_t pad_size = DFLT_PAD_SIZE;
     size_t task_size = DFLT_TASK_SIZE;
     uint64_t task_rounds = DFLT_TASK_ROUNDS;
-    double entropy = DFLT_ENTRPY;
+    int entropy = DFLT_ENTRPY;
     size_t threads = DFLT_THREADS;
 
     /* parse arguments */
@@ -221,18 +223,10 @@ int main(int argc, char **argv) {
     /* do the easy actions */
     if (flags & FLAG_K && ! (flags & (FLAG_E | FLAG_D))) {
         ciphart_warn(
-            "entropy is calculated based on:\n\n"
+            "entropy is calculated based on parameters:\n"
             "      - encryption/decryption using xchacha20.\n"
             "      - %llu bytes key size.\n"
-            "      - %llu chunk size (set by '-t').\n\n"
-
-            "   while using other methods will still limit risk of\n"
-            "   brute-forcing, the meaning of the calculated entropy\n"
-            "   bits won't be guaranteed to be true.\n\n"
-
-            "   this is not an algorithmic limitation, but purely an\n"
-            "   implementation one as i didn't find a need to support\n"
-            "   other methods than the one stated above.\n",
+            "      - %llu chunk size (set by '-t').",
         SIZE_KEY, task_size);
     } else if (flags & FLAG_W) {
         ciphart_banner(exec_name);
@@ -286,27 +280,40 @@ int main(int argc, char **argv) {
 
     /* make sure that the requested entropy is large enough to result in
      * working in the pad twice.  because twice is the smallest number that
-     * the cross-tax xor-ing happens (to introduce memory hardness).
-     *
-     * this is a simplified version of the following:
-     *      pow(2, entropy) < 2.0 * pad_size / ask_size * task_rounds
-     * except for being in log form (in order to avoid memory overflows) */
-    if (entropy < log2(2.0) + log2(pad_size) - log2(task_size) \
-                  + log2(task_rounds)
-    ) {
+     * the cross-tax xor-ing happens (to introduce memory hardness) */
+    uint64_t tasks = pad_size / task_size;
+    uint64_t pads = (1llu << entropy) / tasks / task_rounds;
+    if (pads < 2) {
         ciphart_warn(
-            "'-n %.2lf' is too small for '-m %zu -t %zu -r %llu'.",
+            "'-n %d' is too small for '-m %zu -t %zu -r %llu'.",
             entropy, pad_size, task_size, task_rounds
         );
-        entropy = log2(2.0) + log2(pad_size) - log2(task_size) + \
-                  log2(task_rounds);
-        ciphart_warn("using '-n %.2lf' instead...", entropy);
+        do {
+            if (entropy > ENTRPY_MAX) {
+                ciphart_err(
+                    "no entropy can satisfy '-m %zu -t %zu -r %llu'.",
+                    pad_size, task_size, task_rounds
+                );
+                return RETURN_FAIL_ARGS;
+            }
+            entropy++;
+            pads = (1llu << entropy) / tasks / task_rounds;
+        } while (pads < 2);
+        ciphart_warn("using '-n %d' instead...", entropy);
+    }
+
+    /* add one extra pad if there were remainders */
+    if (
+        (1llu << entropy) % tasks
+        || (1llu << entropy) / tasks % task_rounds
+    ) {
+        pads++;
     }
 
     /* print settings' summary */
-    if (flags & FLAG_K) {
+    if (verbose && flags & FLAG_K) {
         ciphart_info(
-            "key derivation's settings: -m%zu -t%zd -r%llu -n%lf",
+            "key derivation's settings: -m%zu -t%zd -r%llu -n%d",
             pad_size, task_size, task_rounds, entropy
         );
     }
@@ -326,21 +333,27 @@ int main(int argc, char **argv) {
      * getting key      deriving new key    header/state    enc/dec
      * ------------------------------- time ----------------------------->
      *
-     * key----------------------------------*               buf_cleartext
-     * key_confirm*     ids---*             header*         buf_ciphertext
-     * buf_pass---*     args--*
-     *                  nonces*
+     * key----------------------------------*
+     * key_confirm*     ids---*             cipher_state----*
+     * buf_pass---*     args--*             header*         buf_cleartext
+     * hash_state-*     nonces*                             buf_ciphertext
      *                  xor---*
      */
     size_t moah_phases[4];
-    moah_phases[0] = SIZE_KEY + SIZE_KEY + 1;
+    moah_phases[0] = SIZE_KEY + SIZE_KEY + 1 \
+                     + sizeof(crypto_generichash_state);
     moah_phases[1] = SIZE_KEY                              \
                      + threads * sizeof(pthread_t)         \
                      + threads * sizeof(struct thread_arg) \
                      + threads * SIZE_NONCE                \
                      + sizeof(uint64_t);
-    moah_phases[2] = SIZE_KEY + SIZE_HEADER;
-    moah_phases[3] = chunk_clr + chunk_enc;
+    moah_phases[2] = SIZE_KEY + SIZE_HEADER \
+                     + sizeof(crypto_secretstream_xchacha20poly1305_state);
+    moah_phases[3] = chunk_clr + chunk_enc + SIZE_KEY \
+                     + sizeof(crypto_secretstream_xchacha20poly1305_state);
+    moah_phases[3] = SIZE_KEY \
+                     + sizeof(crypto_secretstream_xchacha20poly1305_state) \
+                     + chunk_clr + chunk_enc;
     size_t moah_size = 0;
     int phase_id;
     for (phase_id = 0; phase_id < 4; phase_id++) {
@@ -355,20 +368,28 @@ int main(int argc, char **argv) {
     }
 
     /* partition moah */
-    unsigned char *key = moah; /* phase 0 */
-    unsigned char *key_confirm  = key + SIZE_KEY;
-    unsigned char *buf_pass = key_confirm + 1;
-    pthread_t *ids = (void *)key_confirm; /* phase 1 */
-    struct thread_arg *args = (void *)(ids  + threads);
-    unsigned char *nonces = (void *)(args  + threads);
+    /* phase 0 */
+    unsigned char *key = moah;
+    unsigned char *key_confirm = key + SIZE_KEY;
+    unsigned char *buf_pass = key_confirm + SIZE_KEY;
+    crypto_generichash_state *hash_state = (void *)(buf_pass + 1);
+    /* phase 1 */
+    pthread_t *ids = (void *)key_confirm;
+    struct thread_arg *args = (void *)(ids + threads);
+    unsigned char *nonces = (void *)(args + threads);
     uint64_t *xor = (uint64_t *)(nonces + threads * SIZE_NONCE);
-    unsigned char *header = key_confirm; /* phase 2 */
-    unsigned char *buf_cleartext = moah; /* phase 3 */
+    /* phase 2 */
+    crypto_secretstream_xchacha20poly1305_state *cipher_state = \
+        (void *)ids;
+    unsigned char *header = (void *)(cipher_state + 1);
+    /* phase 3 */
+    unsigned char *buf_cleartext = header;
     unsigned char *buf_ciphertext = buf_cleartext + chunk_clr;
 
     /* get key */
     int key_r = ciphart_get_key(
-        flags, buf_pass, key, key_confirm, pass_stdin, pass_confirm
+        flags, buf_pass, key, hash_state, key_confirm, pass_stdin,
+        pass_confirm
     );
     if (key_r) {
         r = key_r;
@@ -377,12 +398,13 @@ int main(int argc, char **argv) {
 
     /* derive a more expensive key that's worth 'entropy' bits */
     if (flags & FLAG_K) {
-        ciphart_info(
-            "deriving a better key worth ~%.2f more entropy bits...",
-            entropy
-        );
+        if (verbose)
+            ciphart_info(
+                "deriving a better key worth ~%d more entropy bits...",
+                entropy
+            );
         int kdf_r = ciphart_complicate(
-                entropy, pad_size, task_size, task_rounds, threads,
+                pad_size, task_size, pads, task_rounds, threads,
                 key, ids, args, nonces, xor
             );
         if (kdf_r) {
@@ -415,9 +437,12 @@ int main(int argc, char **argv) {
 
     /* encrypt input into output? */
     if (flags & FLAG_E) {
-        ciphart_info("encrypting '%s' into '%s'...", path_in, path_out);
+        if (verbose)
+            ciphart_info(
+                "encrypting '%s' into '%s'...", path_in, path_out
+            );
         int r_enc = ciphart_enc(
-            key, header, buf_cleartext, buf_ciphertext,
+            key, header, cipher_state, buf_cleartext, buf_ciphertext,
             chunk_clr, path_in, path_out
         );
         if (r_enc) {
@@ -429,9 +454,12 @@ int main(int argc, char **argv) {
 
     /* decrypt input into output? */
     if (flags & FLAG_D) {
-        ciphart_info("decrypting '%s' into '%s'...", path_in, path_out);
+        if (verbose)
+            ciphart_info(
+                "decrypting '%s' into '%s'...", path_in, path_out
+            );
         int r_dec = ciphart_dec(
-            key, header, buf_ciphertext, buf_cleartext,
+            key, header, cipher_state, buf_ciphertext, buf_cleartext,
             chunk_enc, path_in, path_out
         );
         if (r_dec) {
@@ -467,7 +495,6 @@ void ciphart_err(const char *fmt, ...) {
 
 /* print warning */
 void ciphart_warn(const char *fmt, ...) {
-    if (! verbose) return;
     fprintf(stderr,"WARNIG: ");
     va_list args;
     va_start(args, fmt);
@@ -478,20 +505,11 @@ void ciphart_warn(const char *fmt, ...) {
 
 /* print info */
 void ciphart_info(const char *fmt, ...) {
-    if (! verbose) return;
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
     va_end(args);
     fprintf(stderr,"\n");
-}
-
-/* print prompt */
-void ciphart_prompt(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
 }
 
 /* print banner */
@@ -539,16 +557,15 @@ void ciphart_help(char *exec_name) {
         " -v        enable verbose output.\n\n"
 
         "KDF\n"
-        " -m INT    size of memory pad.  default is '%lu'.\n"
-        " -t INT    bytes of each task in the pad.  default is '%lu'.\n"
-        " -r INT    repetition in each task.  default is '%llu'.\n"
-        " -n REAL   entropy bits.  default is '%.2f'.\n"
-        " -j INT    number of concurrent threads.  default is '%d'.\n\n"
+        " -m NUM    size of memory pad.  default is '%llu'.\n"
+        " -t NUM    bytes of each task in the pad.  default is '%llu'.\n"
+        " -r NUM    repetition in each task.  default is '%"PRId64"'.\n"
+        " -n NUM    entropy bits.  default is '%d'.\n"
+        " -j NUM    number of concurrent threads.  default is '%d'.\n\n"
 
         "VALUES\n"
         " PATH      file path.  '-' means STDIN or STDOUT.\n"
-        " INT       positive integer.\n"
-        " REAL      positive real number.\n\n"
+        " NUM       positive integer.\n\n"
 
         "RETURN CODES\n"
         " %d         success.\n"
@@ -589,7 +606,7 @@ int ciphart_parse_args(
     int argc, char **argv, int *flags,
     int *pass_stdin, int *pass_confirm, char **path_in, char **path_out,
     size_t *pad_size, size_t *task_size, uint64_t *task_rounds,
-    double *entropy, size_t *threads
+    int *entropy, size_t *threads
 ) {
     int arg_parse_err = ARG_PARSE_OK, opt;
     while ((opt = getopt(
@@ -635,31 +652,32 @@ int ciphart_parse_args(
                 break;
             case 'm': /* total memory for the pad */
                 if (ciphart_str2size_t(
-                    optarg, sizeof(uint64_t) * 2, SIZE_MAX, pad_size
+                    'm', optarg, sizeof(uint64_t) * 2, SIZE_MAX, pad_size
                 )) arg_parse_err = ARG_PARSE_ERR;
                 *flags |= FLAG_M;
                 break;
             case 't': /* size of each task in the pad */
                 if (ciphart_str2size_t(
-                    optarg, sizeof(uint64_t), SIZE_MAX / 2, task_size
+                    't', optarg, sizeof(uint64_t) * 2, SIZE_MAX / 2,
+                    task_size
                 )) arg_parse_err = ARG_PARSE_ERR;
                 *flags |= FLAG_T;
                 break;
             case 'r': /* rounds in each task */
                 if (ciphart_str2uint64_t(
-                    optarg, 1, UINT64_MAX / 2, task_rounds
+                    'r', optarg, 1, UINT64_MAX / 2, task_rounds
                 )) arg_parse_err = ARG_PARSE_ERR;
                 *flags |= FLAG_R;
                 break;
             case 'n': /* entropy bits */
-                if (ciphart_str2double(
-                    optarg, 0, 63, entropy
+                if (ciphart_str2int(
+                    'n', optarg, 0, ENTRPY_MAX, entropy
                 )) arg_parse_err = ARG_PARSE_ERR;
                 *flags |= FLAG_N;
                 break;
             case 'j': /* number of concurrent threads */
                 if (ciphart_str2size_t(
-                    optarg, 1, SIZE_MAX / sizeof(struct thread_arg),
+                    'j', optarg, 1, SIZE_MAX / sizeof(struct thread_arg),
                     threads
                 )) arg_parse_err = ARG_PARSE_ERR;
                 *flags |= FLAG_J;
@@ -794,6 +812,7 @@ int ciphart_parse_args(
 int ciphart_get_key(
     int flags,
     unsigned char *buf_pass, unsigned char *key,
+    crypto_generichash_state *state,
     unsigned char *key_confirm, int pass_stdin, int pass_confirm
 ) {
     int r = RETURN_FAIL;
@@ -835,21 +854,21 @@ int ciphart_get_key(
     unsigned char attempt = 0;
     unsigned char *buf_tmp;
     while (1) {
-        ciphart_prompt(prompts[attempt % 2]);
+        if (pass_stdin) ciphart_info(prompts[attempt % 2]);
+        else fprintf(stderr, prompts[attempt % 2]);
 
         /* read password and hash */
-        crypto_generichash_state state;
         ssize_t len;
-        crypto_generichash_init(&state, NULL, 0, SIZE_KEY);
+        crypto_generichash_init(state, NULL, 0, SIZE_KEY);
         while ((len = read(fd, buf_pass, 1)) > 0) {
             if (! pass_stdin && buf_pass[0] == '\n') {
                 break;
             } else {
-                crypto_generichash_update(&state, buf_pass, len);
+                crypto_generichash_update(state, buf_pass, len);
             }
         }
-        fprintf(stderr, "\n");
-        crypto_generichash_final(&state, key, SIZE_KEY);
+        if (! pass_stdin) fprintf(stderr, "\n");
+        crypto_generichash_final(state, key, SIZE_KEY);
 
         /* repeat if confirmation is needed and keys mismatched */
         if (flags & FLAG_E && pass_confirm) {
@@ -891,45 +910,81 @@ fail:
 
 /* convert strings into numbers within range */
 int ciphart_str2size_t(
-    const char *s, size_t min, size_t max, size_t *out
+    char f, const char *s, size_t min, size_t max, size_t *out
 ) {
-    errno = 0;
-    char *end;
-    unsigned long long x = strtoull(s, &end, 10);
-    if (x > SIZE_MAX || errno == ERANGE) {
-        ciphart_err("%s' is too big for 'size_t'.", s);
-        return RETURN_FAIL;
+    *out = 0;
+    int i, num;
+    for (i = 0; s[i] >= '0' && s[i] <= '9'; i++) {
+        num = s[i] - '0';
+        if (*out > max / 10 - num + max % 10) {
+            ciphart_err("'-%c %s' is larger than maximum '%zu'", f, s, max);
+            return RETURN_FAIL_ARGS;
+        }
+        *out *= 10;
+        *out += num;
     }
-    *out = x;
-    if (end == s || *end != '\0') {
-        ciphart_err("'%s' is not a valid 'size_t' number.", s);
-        return RETURN_FAIL;
+    if (s[i] != '\0') {
+        ciphart_err("'-%c %s' contains illegal symbol '%c'", f, s, s[i]);
+        return RETURN_FAIL_ARGS;
     }
-    if (*out > max || *out < min) {
-        ciphart_err("'%s' is not in [%zu, %zu].", s, min, max);
-        return RETURN_FAIL;
+    if (*out < min) {
+        ciphart_err("'-%c %s' is smaller than minimum '%zu'", f, s, min);
+        return RETURN_FAIL_ARGS;
     }
     return RETURN_OK;
 }
 
 int ciphart_str2uint64_t(
-    const char *s, uint64_t min, uint64_t max, uint64_t *out
+    char f, const char *s, uint64_t min, uint64_t max, uint64_t *out
 ) {
-    errno = 0;
-    char *end;
-    unsigned long long x = strtoull(s, &end, 10);
-    if (x > UINT64_MAX || errno == ERANGE) {
-        ciphart_err("%s' is too big for 'uint64_t'.", s);
-        return RETURN_FAIL;
+    *out = 0;
+    int i, num;
+    for (i = 0; s[i] >= '0' && s[i] <= '9'; i++) {
+        num = s[i] - '0';
+        if (*out > max / 10 - num + max % 10) {
+            ciphart_err(
+                "'-%c %s' is larger than maximum '%"PRId64"'", f, s, max
+            );
+            return RETURN_FAIL_ARGS;
+        }
+        *out *= 10;
+        *out += num;
     }
-    *out = x;
-    if (end == s || *end != '\0') {
-        ciphart_err("'%s' is not a valid 'uint64_t' number.", s);
-        return RETURN_FAIL;
+    if (s[i] != '\0') {
+        ciphart_err("'-%c %s' contains illegal symbol '%c'", f, s, s[i]);
+        return RETURN_FAIL_ARGS;
     }
-    if (*out > max || *out < min) {
-        ciphart_err("'%s' is not in [%llu, %llu].", s, min, max);
-        return RETURN_FAIL;
+    if (*out < min) {
+        ciphart_err(
+            "'-%c %s' is smaller than minimum '%"PRId64"'",
+            f, s, min
+        );
+        return RETURN_FAIL_ARGS;
+    }
+    return RETURN_OK;
+}
+
+int ciphart_str2int(
+    char f, const char *s, int min, int max, int *out
+) {
+    *out = 0;
+    int i, num;
+    for (i = 0; s[i] >= '0' && s[i] <= '9'; i++) {
+        num = s[i] - '0';
+        if (*out > max / 10 - num + max % 10) {
+            ciphart_err("'-%c %s' is larger than maximum '%d'", f, s, max);
+            return RETURN_FAIL_ARGS;
+        }
+        *out *= 10;
+        *out += num;
+    }
+    if (s[i] != '\0') {
+        ciphart_err("'-%c %s' contains illegal symbol '%c'", f, s, s[i]);
+        return RETURN_FAIL_ARGS;
+    }
+    if (*out < min) {
+        ciphart_err("'-%c %s' is smaller than minimum '%d'", f, s, min);
+        return RETURN_FAIL_ARGS;
     }
     return RETURN_OK;
 }
@@ -959,17 +1014,16 @@ int ciphart_str2double(
 /* worker thread */
 void *ciphart_thread(void *arg) {
     struct thread_arg *a = arg;
+    uint64_t *task_id = (uint64_t *)(a->nonce) + 1;
     uint64_t *round_id = (uint64_t *)(a->nonce) + 2;
     unsigned char *buf1 = a->pad + a->first_task_id * a->task_size;
     unsigned char *buf2 = buf1 + a->task_size;
     unsigned char *buf_tmp;
-    uint64_t task_id;
     for (
-        task_id = a->first_task_id;
-        task_id < a->first_task_id + a->tasks;
-        task_id += 2
+        *task_id = a->first_task_id;
+        *task_id < a->first_task_id + a->tasks;
+        (*task_id) += 2
     ) {
-        *(a->nonce + 1) = task_id;
         for (
             *round_id = 0;
             *round_id < a->task_rounds * 2;/* repeat twice since this
@@ -1014,15 +1068,18 @@ void *ciphart_thread(void *arg) {
 }
 
 /* derive a more expensive key */
-int ciphart_complicate (
-    double entropy, size_t pad_size, size_t task_size,
-    uint64_t task_rounds, size_t threads,
-    unsigned char *key, pthread_t *ids,
-    struct thread_arg *a,
+int ciphart_complicate(
+    size_t pad_size, size_t task_size,
+    uint64_t pads, uint64_t task_rounds, size_t threads,
+    unsigned char *key, pthread_t *ids, struct thread_arg *a,
     unsigned char *nonces, uint64_t *xor
 ) {
     /* function's initial return code */
     int r = RETURN_FAIL;
+
+    /* make xor independent of how moah gets repartitioned over the
+     * releases of ciphart */
+    *xor = 0;
 
     /* securely allocate the working pad for the tasks */
     unsigned char *pad = sodium_malloc(pad_size);
@@ -1059,7 +1116,6 @@ int ciphart_complicate (
     }
 
     /* work on the pads and the tasks in them */
-    uint64_t pads = pow(2, entropy) / tasks / task_rounds + 0.999;
     uint64_t pad_id;
     unsigned char *buf;
     char time_left_desc[TIME_LEFT_DESC_SIZE];
@@ -1101,11 +1157,11 @@ int ciphart_complicate (
 
         /* update ui to show progress */
         ui_update += tasks * task_rounds;
-        if (ui_update > UI_UPDATE_THRESHOLD) {
+        if (verbose && ui_update > UI_UPDATE_THRESHOLD) {
             ui_update = 0;
             ciphart_info(
                 "added %f bits worth of difficulty.  %s left...",
-                log2((pad_id + 1) * tasks * task_rounds),
+                log2(pad_id + 1) + log2(tasks) + log2(task_rounds),
                 ciphart_oracle(
                     (pad_id + 1) * tasks * task_rounds,
                     pads * tasks * task_rounds, time_start, time_left_desc
@@ -1115,12 +1171,13 @@ int ciphart_complicate (
     }
 
     /* how much entropy did we actually add? */
-    fprintf(stderr, "\r");
-    ciphart_info(
-        "added %f bits from %llu pads containing %llu %llu-round tasks.",
-        log2((pad_id + 1) * tasks * task_rounds),
-        pad_id, tasks, task_rounds
-    );
+    if (verbose)
+        ciphart_info(
+            "added %f bits from %" PRId64
+            " pads with %" PRId64 " %"PRId64"-round tasks.",
+            log2(pads) + log2(tasks) + log2(task_rounds),
+            pad_id, tasks, task_rounds
+        );
 
     /* compress whole pad into a better key */
     crypto_generichash(key, SIZE_KEY, pad, pad_size, NULL, 0);
@@ -1133,7 +1190,7 @@ fail:
 }
 
 /* predicts times needed to completion */
-char *ciphart_oracle (
+char *ciphart_oracle(
     uint64_t tasks_done, uint64_t tasks_total,
     time_t time_start, char *time_left_desc
 ) {
@@ -1189,6 +1246,7 @@ int ciphart_eof(int fd, unsigned char *buf, size_t count, ssize_t *len) {
 /* encrypt input into output */
 int ciphart_enc(
     unsigned char *key, unsigned char *header,
+    crypto_secretstream_xchacha20poly1305_state *state,
     unsigned char *buf_cleartext, unsigned char *buf_ciphertext,
     size_t chunk_clr, char *path_in, char *path_out
 ) {
@@ -1200,7 +1258,7 @@ int ciphart_enc(
     /* open input path for read */
     if (strcmp(path_in, "-") == 0) {
         fd_in = STDIN_FILENO;
-        ciphart_prompt("reading input from STDIN (end by EOF)...");
+        ciphart_info("reading input from STDIN (end by EOF)...");
     } else {
         fd_in = open(path_in, O_RDONLY);
     }
@@ -1222,8 +1280,7 @@ int ciphart_enc(
     }
 
     /* get header and state */
-    crypto_secretstream_xchacha20poly1305_state state;
-    crypto_secretstream_xchacha20poly1305_init_push(&state, header, key);
+    crypto_secretstream_xchacha20poly1305_init_push(state, header, key);
     if (fwrite(header, 1, SIZE_HEADER, fp_out) != SIZE_HEADER) {
         ciphart_err("failed to fully write header to '%s'.", path_out);
         r = RETURN_FAIL_IO;
@@ -1252,7 +1309,7 @@ int ciphart_enc(
                 goto fail;
         }
         crypto_secretstream_xchacha20poly1305_push(
-            &state, buf_ciphertext, &out_len, buf_cleartext, in_len,
+            state, buf_ciphertext, &out_len, buf_cleartext, in_len,
             NULL, 0, tag
         );
         if (
@@ -1277,6 +1334,7 @@ fail:
 /* decrypt input into output */
 int ciphart_dec(
     unsigned char *key, unsigned char *header,
+    crypto_secretstream_xchacha20poly1305_state *state,
     unsigned char *buf_ciphertext, unsigned char *buf_cleartext,
     size_t chunk_enc, char *path_in, char *path_out
 ) {
@@ -1288,7 +1346,7 @@ int ciphart_dec(
     /* open input path for read */
     if (strcmp(path_in, "-") == 0) {
         fp_in = stdin;
-        ciphart_prompt("reading input from STDIN (end by EOF)...");
+        ciphart_info("reading input from STDIN (end by EOF)...");
     } else {
         fp_in = fopen(path_in, "r");
     }
@@ -1298,10 +1356,9 @@ int ciphart_dec(
     }
 
     /* get header and state */
-    crypto_secretstream_xchacha20poly1305_state state;
     size_t r_fread = fread(header, 1, SIZE_HEADER, fp_in);
     int r_init = crypto_secretstream_xchacha20poly1305_init_pull(
-        &state, header, key
+        state, header, key
     );
     if (r_fread != SIZE_HEADER || r_init != 0) {
         ciphart_err("incomplete header.");
@@ -1334,7 +1391,7 @@ int ciphart_dec(
         eof = feof(fp_in);
         if (
             crypto_secretstream_xchacha20poly1305_pull(
-                &state, buf_cleartext, &out_len, &tag, buf_ciphertext,
+                state, buf_cleartext, &out_len, &tag, buf_ciphertext,
                 in_len, NULL, 0
             ) != 0
         ) {
