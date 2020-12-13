@@ -46,7 +46,7 @@ test-k:
 	echo "lol" | ./ciphart -sk -j 1  -o tests/current/k/key.j1
 	echo "lol" | ./ciphart -sk -j 3  -o tests/current/k/key.j3
 	echo "lol" | ./ciphart -sk -j 30 -o tests/current/k/key.j30
-	echo "lol" | ciphart -skt8 -m16 -r100 -n24.5 -j5 -o tests/current/k/key.t8.m16.r100.n24.5.j5
+	echo "lol" | ./ciphart -skt8 -m16 -r100 -n24.5 -j5 -o tests/current/k/key.t8.m16.r100.n24.5.j5
 	diff tests/current/k/key                      tests/truth/k/key
 	diff tests/current/k/key.j1                   tests/truth/k/key.j1
 	diff tests/current/k/key.j3                   tests/truth/k/key.j3
