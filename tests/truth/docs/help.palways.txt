@@ -1,0 +1,56 @@
+[0;90mciphart v3.1.1  copyright (C) 2020  caveman
+https://github.com/Al-Caveman/ciphart
+
+this program comes with ABSOLUTELY NO WARRANTY; for details
+type `./ciphart -w'.  this is free software, and you are welcome to
+redistribute it under certain conditions; type `./ciphart -c' for
+details.[0m
+
+[1;37mSYNOPSIS[0m
+ ./ciphart -e       [-s] [-z] [-i PATH] [-o PATH] [-p COLOR]
+ ./ciphart -d       [-s]      [-i PATH] [-o PATH] [-p COLOR]
+ ./ciphart -k       [-s]                [-o PATH] [-p COLOR] [KDF ...]
+ ./ciphart -ek      [-s] [-z] [-i PATH] [-o PATH] [-p COLOR] [KDF ...]
+ ./ciphart -dk      [-s]      [-i PATH] [-o PATH] [-p COLOR] [KDF ...]
+ ./ciphart -{w,c,h}                               [-p COLOR]
+
+[1;37mACTIONS[0m
+ -e        only encrypt input plaintext into output ciphertext.
+ -d        only decrypt input ciphertext into output plaintext.
+ -k        only derive a more secure key.
+ -ek       equals '-e', but also derives a more secure key.
+ -dk       equals '-d', but also derives a more secure key.
+ -w        show warranty notice.
+ -c        show usage conditions.
+ -h        show this help.
+
+[1;37mOPTIONS[0m
+ -s        read passwords via STDIN.
+ -z        disable password confirmation.
+ -i PATH   path to input file.  default is '-' for STDIN.
+ -o PATH   path to output file.  default is '-' for STDOUT.
+ -p COLOR  when to show pretty colors.  default is 'auto'.
+
+[1;37mKDF[0m
+ -m INT    size of memory pad.  default is '999997440'.
+ -t INT    bytes of each task in the pad.  default is '4096'.
+ -r INT    repetition in each task.  default is '1'.
+ -n REAL   entropy bits.  default is '20.00'.
+ -j INT    number of concurrent threads.  default is '4'.
+
+[1;37mVALUES[0m
+ PATH      file path.  '-' means STDIN or STDOUT.
+ INT       positive integer.
+ REAL      positive real number.
+ COLOR     one of:  'auto', 'always' or 'never'.
+
+[1;37mRETURN CODES[0m
+ 0         success.
+ 1         general failure.
+ 2         libsodium failure.
+ 3         argument parsing failure.
+ 4         io failure.
+ 5         memory allocation failure.
+ 6         pthread feailure.
+ 7         bad password or corrupted input.
+ 8         premature input end.

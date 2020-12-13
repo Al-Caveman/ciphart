@@ -38,7 +38,7 @@ here is why:
 # installation
 
 1.  install [`libsodium`](https://libsodium.gitbook.io/doc/).
-2. run `make`.
+2. run `make`.  optionally run `make test`.
 3. somehow put `ciphart` executable somewhere in `PATH` (personally i
    symbolically linked it to `/usr/bin/ciphart`).
 

@@ -166,7 +166,7 @@ struct thread_arg {
 };
 
 /* worker thread */
-int ciphart_thread(struct thread_arg *a);
+void *ciphart_thread(void *arg);
 
 /* derive a more expensive key */
 int ciphart_complicate (
@@ -188,7 +188,7 @@ char *ciphart_oracle(
  * work peacefully, as it assumes that each encrypted chunk is of a given
  * size, except the last one.  basically this tries to feel like feof,
  * except for not using buffered i/o */
-int ciphart_eof(int fd, void *buf, size_t count, ssize_t *read);
+int ciphart_eof(int fd, unsigned char *buf, size_t count, ssize_t *read);
 
 /* encrypt input into output */
 int ciphart_enc(
@@ -382,11 +382,9 @@ int main(int argc, char **argv) {
     unsigned char *key_confirm  = key + SIZE_KEY;
     unsigned char *buf_pass = key_confirm + 1;
     pthread_t *ids = (void *)key_confirm; /* phase 1 */
-    struct thread_arg *args = \
-        (void *)ids  + threads * sizeof(pthread_t);
-    unsigned char *nonces = \
-        (void *)args  + threads * sizeof(struct thread_arg);
-    uint64_t *xor = (void *)nonces + threads * SIZE_NONCE;
+    struct thread_arg *args = (void *)(ids  + threads);
+    unsigned char *nonces = (void *)(args  + threads);
+    uint64_t *xor = (uint64_t *)(nonces + threads * SIZE_NONCE);
     unsigned char *header = key_confirm; /* phase 2 */
     unsigned char *buf_cleartext = moah; /* phase 3 */
     unsigned char *buf_ciphertext = buf_cleartext + chunk_clr;
@@ -421,7 +419,9 @@ int main(int argc, char **argv) {
         if (strcmp(path_out, "-") == 0) {
             fd_kdf = STDOUT_FILENO;
         } else {
-            fd_kdf = open(path_out, O_WRONLY);
+            fd_kdf = open(
+                path_out, O_WRONLY | O_CREAT | O_TRUNC, FILE_MODE_PLAIN
+            );
             if (fd_kdf == -1) {
                 ciphart_err("failed to open '%s' for write", path_out);
                 r = RETURN_FAIL_IO;
@@ -650,7 +650,7 @@ void ciphart_help(char *exec_name) {
 /* fputs */
 int ciphart_fputs(const char *s) {
     if (fputs(s, stdout) == EOF) {
-        ciphart_err("failed fputsing to stderr.");
+        ciphart_err("fputs failed.");
         return RETURN_FAIL_IO;
     }
     return RETURN_OK;
@@ -1034,7 +1034,8 @@ int ciphart_str2double(
 }
 
 /* worker thread */
-int ciphart_thread(struct thread_arg *a) {
+void *ciphart_thread(void *arg) {
+    struct thread_arg *a = arg;
     uint64_t *round_id = (uint64_t *)(a->nonce) + 2;
     unsigned char *buf1 = a->pad + a->first_task_id * a->task_size;
     unsigned char *buf2 = buf1 + a->task_size;
@@ -1146,10 +1147,7 @@ int ciphart_complicate (
             *(uint64_t *)(a[thread].nonce) = pad_id;
             a[thread].pad_id = pad_id;
             if (pthread_create(
-                &ids[thread],
-                NULL,
-                (void *)(void *)&ciphart_thread,
-                &a[thread]
+                &ids[thread], NULL, &ciphart_thread, &a[thread]
             )) {
                 ciphart_err("failed to create threads.");
                 r = RETURN_FAIL_PTHREAD;
@@ -1254,21 +1252,15 @@ char *ciphart_oracle (
  * work peacefully, as it assumes that each encrypted chunk is of a given
  * size, except the last one.  basically this tries to feel like feof,
  * except for not using buffered i/o */
-int ciphart_eof(int fd, void *buf, size_t count, ssize_t *len) {
+int ciphart_eof(int fd, unsigned char *buf, size_t count, ssize_t *len) {
     ssize_t in_len = read(fd, buf, count);
-    if (in_len == -1) {
-        return CEOF_FAIL;
-    } else if (in_len > 0 && (size_t)in_len == count) {
-        *len += in_len;
-        return CEOF_OK;
-    } else if (in_len == 0) {
-        return CEOF_EOF;
-    } else if (in_len > 0 && (size_t)in_len < count) {
-        *len += in_len;
+    if (in_len < 0) return CEOF_FAIL;
+    if (in_len == 0) return CEOF_EOF;
+    *len += in_len;
+    if ((size_t)in_len == count) return CEOF_OK;
+    if ((size_t)in_len < count)
         return ciphart_eof(fd, buf + in_len, count - in_len, len);
-    } else {
-        return CEOF_UNKNOWN;
-    }
+    return CEOF_UNKNOWN;
 }
 
 /* encrypt input into output */
@@ -1290,8 +1282,7 @@ int ciphart_enc(
     }
     if (fd_in == -1) {
         ciphart_err("failed to open '%s' for read.", path_in);
-        r = RETURN_FAIL_IO;
-        goto fail;
+        return RETURN_FAIL_IO;
     }
 
     /* open output path for write */
@@ -1311,7 +1302,8 @@ int ciphart_enc(
     crypto_secretstream_xchacha20poly1305_init_push(&state, header, key);
     if (fwrite(header, 1, SIZE_HEADER, fp_out) != SIZE_HEADER) {
         ciphart_err("failed to fully write header to '%s'.", path_out);
-        return RETURN_FAIL_IO;
+        r = RETURN_FAIL_IO;
+        goto fail;
     }
 
     /* encrypt */
@@ -1377,8 +1369,7 @@ int ciphart_dec(
     }
     if (fp_in == NULL) {
         ciphart_err("failed to open '%s' for read.", path_in);
-        r = RETURN_FAIL_IO;
-        goto fail;
+        return RETURN_FAIL_IO;
     }
 
     /* get header and state */
@@ -1435,7 +1426,11 @@ int ciphart_dec(
             goto fail;
         }
         r_write = write(fd_out, buf_cleartext, (size_t)out_len);
-        if (r_write >= 0 && (unsigned long long)r_write != out_len) {
+        if (r_write < 0) {
+            ciphart_err("failed to write to '%s'", path_out);
+            r = RETURN_FAIL_IO;
+            goto fail;
+        } else if ((unsigned long long)r_write != out_len) {
             ciphart_err("failed to fully write to '%s'", path_out);
             r = RETURN_FAIL_IO;
             goto fail;
