@@ -1,4 +1,4 @@
-[0;90mciphart v3.1.1  copyright (C) 2020  caveman
+[0;90mciphart v3.1.3  copyright (C) 2020  caveman
 https://github.com/Al-Caveman/ciphart
 
 this program comes with ABSOLUTELY NO WARRANTY; for details
