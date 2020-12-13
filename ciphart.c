@@ -270,6 +270,24 @@ int main(int argc, char **argv) {
         return RETURN_OK;
     } else if (flags & FLAG_C) {
         ciphart_fputs(CONDITIONS);
+        ciphart_fputs(CONDITIONS_1);
+        ciphart_fputs(CONDITIONS_2);
+        ciphart_fputs(CONDITIONS_3);
+        ciphart_fputs(CONDITIONS_4);
+        ciphart_fputs(CONDITIONS_5);
+        ciphart_fputs(CONDITIONS_6_a);
+        ciphart_fputs(CONDITIONS_6_b);
+        ciphart_fputs(CONDITIONS_7);
+        ciphart_fputs(CONDITIONS_8);
+        ciphart_fputs(CONDITIONS_9);
+        ciphart_fputs(CONDITIONS_10);
+        ciphart_fputs(CONDITIONS_11);
+        ciphart_fputs(CONDITIONS_12);
+        ciphart_fputs(CONDITIONS_13);
+        ciphart_fputs(CONDITIONS_14);
+        ciphart_fputs(CONDITIONS_15);
+        ciphart_fputs(CONDITIONS_16);
+        ciphart_fputs(CONDITIONS_17);
         return RETURN_OK;
     } else if (flags & FLAG_H) {
         ciphart_help(exec_name);

@@ -68,8 +68,9 @@
 "work under this License, and how to view a copy of this License.  If\n"\
 "the interface presents a list of user commands or options, such as a\n"\
 "menu, a prominent item in the list meets this criterion.\n"\
-"\n"\
-"  1. Source Code.\n"\
+"\n"
+
+#define CONDITIONS_1 "  1. Source Code.\n"\
 "\n"\
 "  The \"source code\" for a work means the preferred form of the work\n"\
 "for making modifications to it.  \"Object code\" means any non-source\n"\
@@ -110,8 +111,9 @@
 "\n"\
 "  The Corresponding Source for a work in source code form is that\n"\
 "same work.\n"\
-"\n"\
-"  2. Basic Permissions.\n"\
+"\n"
+
+#define CONDITIONS_2 "  2. Basic Permissions.\n"\
 "\n"\
 "  All rights granted under this License are granted for the term of\n"\
 "copyright on the Program, and are irrevocable provided the stated\n"\
@@ -135,8 +137,9 @@
 "  Conveying under any other circumstances is permitted solely under\n"\
 "the conditions stated below.  Sublicensing is not allowed; section 10\n"\
 "makes it unnecessary.\n"\
-"\n"\
-"  3. Protecting Users' Legal Rights From Anti-Circumvention Law.\n"\
+"\n"
+
+#define CONDITIONS_3 "  3. Protecting Users' Legal Rights From Anti-Circumvention Law.\n"\
 "\n"\
 "  No covered work shall be deemed part of an effective technological\n"\
 "measure under any applicable law fulfilling obligations under article\n"\
@@ -151,8 +154,9 @@
 "modification of the work as a means of enforcing, against the work's\n"\
 "users, your or third parties' legal rights to forbid circumvention of\n"\
 "technological measures.\n"\
-"\n"\
-"  4. Conveying Verbatim Copies.\n"\
+"\n"
+
+#define CONDITIONS_4 "  4. Conveying Verbatim Copies.\n"\
 "\n"\
 "  You may convey verbatim copies of the Program's source code as you\n"\
 "receive it, in any medium, provided that you conspicuously and\n"\
@@ -164,8 +168,9 @@
 "\n"\
 "  You may charge any price or no price for each copy that you convey,\n"\
 "and you may offer support or warranty protection for a fee.\n"\
-"\n"\
-"  5. Conveying Modified Source Versions.\n"\
+"\n"
+
+#define CONDITIONS_5 "  5. Conveying Modified Source Versions.\n"\
 "\n"\
 "  You may convey a work based on the Program, or the modifications to\n"\
 "produce it from the Program, in the form of source code under the\n"\
@@ -201,8 +206,9 @@
 "beyond what the individual works permit.  Inclusion of a covered work\n"\
 "in an aggregate does not cause this License to apply to the other\n"\
 "parts of the aggregate.\n"\
-"\n"\
-"  6. Conveying Non-Source Forms.\n"\
+"\n"
+
+#define CONDITIONS_6_a "  6. Conveying Non-Source Forms.\n"\
 "\n"\
 "  You may convey a covered work in object code form under the terms\n"\
 "of sections 4 and 5, provided that you also convey the\n"\
@@ -249,8 +255,9 @@
 "    you inform other peers where the object code and Corresponding\n"\
 "    Source of the work are being offered to the general public at no\n"\
 "    charge under subsection 6d.\n"\
-"\n"\
-"  A separable portion of the object code, whose source code is excluded\n"\
+"\n"
+
+#define CONDITIONS_6_b "  A separable portion of the object code, whose source code is excluded\n"\
 "from the Corresponding Source as a System Library, need not be\n"\
 "included in conveying the object code work.\n"\
 "\n"\
@@ -299,8 +306,9 @@
 "documented (and with an implementation available to the public in\n"\
 "source code form), and must require no special password or key for\n"\
 "unpacking, reading or copying.\n"\
-"\n"\
-"  7. Additional Terms.\n"\
+"\n"
+
+#define CONDITIONS_7 "  7. Additional Terms.\n"\
 "\n"\
 "  \"Additional permissions\" are terms that supplement the terms of this\n"\
 "License by making exceptions from one or more of its conditions.\n"\
@@ -363,8 +371,9 @@
 "  Additional terms, permissive or non-permissive, may be stated in the\n"\
 "form of a separately written license, or stated as exceptions;\n"\
 "the above requirements apply either way.\n"\
-"\n"\
-"  8. Termination.\n"\
+"\n"
+
+#define CONDITIONS_8 "  8. Termination.\n"\
 "\n"\
 "  You may not propagate or modify a covered work except as expressly\n"\
 "provided under this License.  Any attempt otherwise to propagate or\n"\
@@ -391,8 +400,9 @@
 "this License.  If your rights have been terminated and not permanently\n"\
 "reinstated, you do not qualify to receive new licenses for the same\n"\
 "material under section 10.\n"\
-"\n"\
-"  9. Acceptance Not Required for Having Copies.\n"\
+"\n"
+
+#define CONDITIONS_9 "  9. Acceptance Not Required for Having Copies.\n"\
 "\n"\
 "  You are not required to accept this License in order to receive or\n"\
 "run a copy of the Program.  Ancillary propagation of a covered work\n"\
@@ -402,8 +412,9 @@
 "modify any covered work.  These actions infringe copyright if you do\n"\
 "not accept this License.  Therefore, by modifying or propagating a\n"\
 "covered work, you indicate your acceptance of this License to do so.\n"\
-"\n"\
-"  10. Automatic Licensing of Downstream Recipients.\n"\
+"\n"
+
+#define CONDITIONS_10 "  10. Automatic Licensing of Downstream Recipients.\n"\
 "\n"\
 "  Each time you convey a covered work, the recipient automatically\n"\
 "receives a license from the original licensors, to run, modify and\n"\
@@ -427,8 +438,9 @@
 "(including a cross-claim or counterclaim in a lawsuit) alleging that\n"\
 "any patent claim is infringed by making, using, selling, offering for\n"\
 "sale, or importing the Program or any portion of it.\n"\
-"\n"\
-"  11. Patents.\n"\
+"\n"
+
+#define CONDITIONS_11 "  11. Patents.\n"\
 "\n"\
 "  A \"contributor\" is a copyright holder who authorizes use under this\n"\
 "License of the Program or a work on which the Program is based.  The\n"\
@@ -496,8 +508,9 @@
 "  Nothing in this License shall be construed as excluding or limiting\n"\
 "any implied license or other defenses to infringement that may\n"\
 "otherwise be available to you under applicable patent law.\n"\
-"\n"\
-"  12. No Surrender of Others' Freedom.\n"\
+"\n"
+
+#define CONDITIONS_12 "  12. No Surrender of Others' Freedom.\n"\
 "\n"\
 "  If conditions are imposed on you (whether by court order, agreement or\n"\
 "otherwise) that contradict the conditions of this License, they do not\n"\
@@ -508,8 +521,9 @@
 "to collect a royalty for further conveying from those to whom you convey\n"\
 "the Program, the only way you could satisfy both those terms and this\n"\
 "License would be to refrain entirely from conveying the Program.\n"\
-"\n"\
-"  13. Use with the GNU Affero General Public License.\n"\
+"\n"
+
+#define CONDITIONS_13 "  13. Use with the GNU Affero General Public License.\n"\
 "\n"\
 "  Notwithstanding any other provision of this License, you have\n"\
 "permission to link or combine any covered work with a work licensed\n"\
@@ -519,8 +533,9 @@
 "but the special requirements of the GNU Affero General Public License,\n"\
 "section 13, concerning interaction through a network will apply to the\n"\
 "combination as such.\n"\
-"\n"\
-"  14. Revised Versions of this License.\n"\
+"\n"
+
+#define CONDITIONS_14 "  14. Revised Versions of this License.\n"\
 "\n"\
 "  The Free Software Foundation may publish revised and/or new versions of\n"\
 "the GNU General Public License from time to time.  Such new versions will\n"\
@@ -545,8 +560,9 @@
 "permissions.  However, no additional obligations are imposed on any\n"\
 "author or copyright holder as a result of your choosing to follow a\n"\
 "later version.\n"\
-"\n"\
-"  15. Disclaimer of Warranty.\n"\
+"\n"
+
+#define CONDITIONS_15 "  15. Disclaimer of Warranty.\n"\
 "\n"\
 "  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY\n"\
 "APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT\n"\
@@ -556,8 +572,9 @@
 "PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM\n"\
 "IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF\n"\
 "ALL NECESSARY SERVICING, REPAIR OR CORRECTION.\n"\
-"\n"\
-"  16. Limitation of Liability.\n"\
+"\n"
+
+#define CONDITIONS_16 "  16. Limitation of Liability.\n"\
 "\n"\
 "  IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING\n"\
 "WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS\n"\
@@ -568,8 +585,9 @@
 "PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS),\n"\
 "EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF\n"\
 "SUCH DAMAGES.\n"\
-"\n"\
-"  17. Interpretation of Sections 15 and 16.\n"\
+"\n"
+
+#define CONDITIONS_17 "  17. Interpretation of Sections 15 and 16.\n"\
 "\n"\
 "  If the disclaimer of warranty and limitation of liability provided\n"\
 "above cannot be given local legal effect according to their terms,\n"\
