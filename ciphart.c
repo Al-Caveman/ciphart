@@ -29,7 +29,7 @@
 #include <stdio.h>      /* printf, fprintf, vfprintf, va_*, freadf, feof,
                             rewind, fputs */
 #include <stdlib.h>     /* strtoull, strtod, exit */
-#include <string.h>     /* strcmp */
+#include <string.h>     /* strcmp, strlen */
 #include <sys/stat.h>   /* open */
 #include <sys/types.h>  /* open */
 #include <termios.h>    /* tcgetattr, tcsetattr */
@@ -38,7 +38,7 @@
                             tcgetattr, tcsetattr, write  */
 
 #define APP_NAME "ciphart"
-#define APP_VERSION "4.0.0"
+#define APP_VERSION "4.0.1"
 #define APP_YEAR "2020"
 #define APP_URL "https://github.com/Al-Caveman/ciphart"
 #define ARG_PARSE_OK 0
@@ -825,7 +825,7 @@ int ciphart_get_key(
         prompts[0] = "reading password from STDIN (end by EOF)...";
         prompts[1] = "confirming password from STDIN (end by EOF)...";
     } else {
-        fd = open(DEV_TTY, O_RDONLY);
+        fd = open(DEV_TTY, O_RDWR | O_NOCTTY);
         prompts[0] = "password: ";
         prompts[1] = "confirming password: ";
         if (fd == -1) {
@@ -835,27 +835,32 @@ int ciphart_get_key(
         }
     }
 
-    /* disable terminal echo */
-    struct termios termios_old, termios_new;
-    if (! pass_stdin) {
-        if (tcgetattr(fd, &termios_old)) {
-            ciphart_err("failed to get terminal settings.");
-            return RETURN_FAIL_IO;
-        }
-        termios_new = termios_old;
-        termios_new.c_lflag &= ~ECHO;
-        if (tcsetattr(fd, TCSAFLUSH, &termios_new)) {
-            ciphart_err("failed to disable terminal echo.");
-            return RETURN_FAIL_IO;
-        }
-    }
-
     /* obtain password */
     unsigned char attempt = 0;
     unsigned char *buf_tmp;
+    struct termios termios_old, termios_new;
     while (1) {
+        /* disable terminal echo */
+        if (! pass_stdin) {
+            if (tcgetattr(fd, &termios_old)) {
+                ciphart_err("failed to get terminal settings.");
+                return RETURN_FAIL_IO;
+            }
+            termios_new = termios_old;
+            termios_new.c_lflag &= ~ECHO;
+            if (tcsetattr(fd, TCSAFLUSH, &termios_new)) {
+                ciphart_err("failed to disable terminal echo.");
+                return RETURN_FAIL_IO;
+            }
+        }
+
+        /* write prompt */
         if (pass_stdin) ciphart_info(prompts[attempt % 2]);
-        else fprintf(stderr, prompts[attempt % 2]);
+        else {
+            write(
+                fd, prompts[attempt % 2], strlen(prompts[attempt % 2])
+            );
+        }
 
         /* read password and hash */
         ssize_t len;
@@ -867,7 +872,7 @@ int ciphart_get_key(
                 crypto_generichash_update(state, buf_pass, len);
             }
         }
-        if (! pass_stdin) fprintf(stderr, "\n");
+        if (! pass_stdin) write(fd, "\n", 1);
         crypto_generichash_final(state, key, SIZE_KEY);
 
         /* repeat if confirmation is needed and keys mismatched */

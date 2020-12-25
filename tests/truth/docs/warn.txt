@@ -1,4 +1,4 @@
-ciphart v4.0.0  copyright (C) 2020  caveman
+ciphart v4.0.1  copyright (C) 2020  caveman
 https://github.com/Al-Caveman/ciphart
 
 this program comes with ABSOLUTELY NO WARRANTY; for details
