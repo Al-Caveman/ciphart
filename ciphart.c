@@ -38,7 +38,7 @@
                             tcgetattr, tcsetattr, write  */
 
 #define APP_NAME "ciphart"
-#define APP_VERSION "4.0.1"
+#define APP_VERSION "5.0.0"
 #define APP_YEAR "2020"
 #define APP_URL "https://github.com/Al-Caveman/ciphart"
 #define ARG_PARSE_OK 0
@@ -822,8 +822,8 @@ int ciphart_get_key(
     char *prompts[2];
     if (pass_stdin) {
         fd = STDIN_FILENO;
-        prompts[0] = "reading password from STDIN (end by EOF)...";
-        prompts[1] = "confirming password from STDIN (end by EOF)...";
+        prompts[0] = "reading password from STDIN (end by newline)...";
+        prompts[1] = "confirming password from STDIN (end by newline)...";
     } else {
         fd = open(DEV_TTY, O_RDWR | O_NOCTTY);
         prompts[0] = "password: ";
@@ -855,29 +855,42 @@ int ciphart_get_key(
         }
 
         /* write prompt */
-        if (pass_stdin) ciphart_info(prompts[attempt % 2]);
+        if (pass_stdin) ciphart_info(prompts[attempt]);
         else {
             write(
-                fd, prompts[attempt % 2], strlen(prompts[attempt % 2])
+                fd, prompts[attempt], strlen(prompts[attempt])
             );
         }
 
         /* read password and hash */
-        ssize_t len;
+        int eof = 0;
         crypto_generichash_init(state, NULL, 0, SIZE_KEY);
-        while ((len = read(fd, buf_pass, 1)) > 0) {
-            if (! pass_stdin && buf_pass[0] == '\n') {
-                break;
-            } else {
-                crypto_generichash_update(state, buf_pass, len);
+        while (1) {
+            ssize_t len = 0;
+            switch (ciphart_eof(fd, buf_pass, 1, &len)) {
+                case CEOF_OK:
+                    break;
+                case CEOF_EOF:
+                    eof = 1;
+                    break;
+                case CEOF_FAIL:
+                    ciphart_err("failed to read password.");
+                    r = RETURN_FAIL_IO;
+                    goto fail;
+                case CEOF_UNKNOWN:
+                    ciphart_err("mystery when reading password.");
+                    r = RETURN_FAIL_IO;
+                    goto fail;
             }
+            if (*buf_pass == '\n' || eof) break;
+            crypto_generichash_update(state, buf_pass, len);
         }
         if (! pass_stdin) write(fd, "\n", 1);
         crypto_generichash_final(state, key, SIZE_KEY);
 
         /* repeat if confirmation is needed and keys mismatched */
         if (flags & FLAG_E && pass_confirm) {
-            if (attempt % 2) {
+            if (attempt == 1) {
                 size_t i;
                 int mismatched = 0;
                 for (i = 0; i < SIZE_KEY; i++) {
@@ -886,13 +899,11 @@ int ciphart_get_key(
                         break;
                     }
                 }
-                if (mismatched == 0) {
-                    goto success;
-                } else {
-                    ciphart_err("passwords mismatched.  retrying...");
-                }
+                if (mismatched == 0) goto success;
+                ciphart_err("passwords mismatched.  retrying...");
             }
             attempt++;
+            if (attempt > 1) attempt = 0;
             buf_tmp = key;
             key = key_confirm;
             key_confirm = buf_tmp;
@@ -1417,7 +1428,8 @@ int ciphart_dec(
             ciphart_err("failed to write to '%s'", path_out);
             r = RETURN_FAIL_IO;
             goto fail;
-        } else if ((unsigned long long)r_write != out_len) {
+        }
+        if ((unsigned long long)r_write != out_len) {
             ciphart_err("failed to fully write to '%s'", path_out);
             r = RETURN_FAIL_IO;
             goto fail;

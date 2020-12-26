@@ -4,7 +4,7 @@ CFLAGS=-Wall -Wextra -march=native -mtune=native -std=c99 -pedantic -g
 APP=./ciphart
 TRU=tests/truth
 CUR=tests/current
-PAS=echo "testing password 123 let me in!"
+PAS=echo -n "testing password 123 let me in!"
 DIF=diff --color=always -u
 
 .PHONY: all
