@@ -647,7 +647,7 @@ int ciphart_parse_args(
                 break;
             case 'm': /* total memory for the pad */
                 if (ciphart_str2size_t(
-                    'm', optarg, sizeof(uint64_t) * 2, SIZE_MAX, pad_size
+                    'm', optarg, sizeof(uint64_t) * 4, SIZE_MAX, pad_size
                 )) arg_parse_err = ARG_PARSE_ERR;
                 *flags |= FLAG_M;
                 break;
