@@ -222,12 +222,7 @@ int main(int argc, char **argv) {
 
     /* do the easy actions */
     if (flags & FLAG_K && ! (flags & (FLAG_E | FLAG_D))) {
-        ciphart_warn(
-            "entropy is calculated based on parameters:\n"
-            "      - encryption/decryption using xchacha20.\n"
-            "      - %llu bytes key size.\n"
-            "      - %llu chunk size (set by '-t').",
-        SIZE_KEY, task_size);
+        ciphart_warn("entropy is calculated based on xchacha20");
     } else if (flags & FLAG_W) {
         ciphart_banner(exec_name);
         ciphart_fputs(WARRANTY);
