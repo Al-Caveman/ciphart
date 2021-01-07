@@ -527,19 +527,19 @@ void ciphart_help(char *exec_name) {
     fprintf(
         stdout,
         "SYNOPSIS\n"
+        " %s -k       [KDF ...]           [-o PATH] [-s]      [-v]\n"
+        " %s -ke      [KDF ...] [-i PATH] [-o PATH] [-s] [-z] [-v]\n"
+        " %s -kd      [KDF ...] [-i PATH] [-o PATH] [-s]      [-v]\n"
         " %s -e                 [-i PATH] [-o PATH] [-s] [-z] [-v]\n"
         " %s -d                 [-i PATH] [-o PATH] [-s]      [-v]\n"
-        " %s -k       [KDF ...]           [-o PATH] [-s]      [-v]\n"
-        " %s -ek      [KDF ...] [-i PATH] [-o PATH] [-s] [-z] [-v]\n"
-        " %s -dk      [KDF ...] [-i PATH] [-o PATH] [-s]      [-v]\n"
         " %s -{w,c,h}\n\n"
 
         "ACTIONS\n"
-        " -e        only encrypt input plaintext into output ciphertext.\n"
-        " -d        only decrypt input ciphertext into output plaintext.\n"
-        " -k        only derive a more secure key.\n"
-        " -ek       equals '-e', but also derives a more secure key.\n"
-        " -dk       equals '-d', but also derives a more secure key.\n"
+        " -k        only derive a better key.\n"
+        " -ke       derives a better key and encrypts input into output.\n"
+        " -kd       derives a better key and decrypts input into output.\n"
+        " -e        only encrypt input into output ciphertext.\n"
+        " -d        only decrypt input into output plaintext.\n"
         " -w        show warranty notice.\n"
         " -c        show usage conditions.\n"
         " -h        show this help.\n\n"
@@ -732,7 +732,7 @@ int ciphart_parse_args(
     /* '-z' is only valid for enc */
     if (*flags & FLAG_Z && ! (*flags & FLAG_E)) {
         ciphart_err(
-            "option '-z' is valid only with '-e' or '-ek'.");
+            "option '-z' is valid only with '-e' or '-ke'.");
         arg_parse_err = ARG_PARSE_ERR;
     }
 

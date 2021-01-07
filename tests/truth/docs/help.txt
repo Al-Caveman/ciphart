@@ -7,19 +7,19 @@ redistribute it under certain conditions; type `./ciphart -c' for
 details.
 
 SYNOPSIS
+ ./ciphart -k       [KDF ...]           [-o PATH] [-s]      [-v]
+ ./ciphart -ke      [KDF ...] [-i PATH] [-o PATH] [-s] [-z] [-v]
+ ./ciphart -kd      [KDF ...] [-i PATH] [-o PATH] [-s]      [-v]
  ./ciphart -e                 [-i PATH] [-o PATH] [-s] [-z] [-v]
  ./ciphart -d                 [-i PATH] [-o PATH] [-s]      [-v]
- ./ciphart -k       [KDF ...]           [-o PATH] [-s]      [-v]
- ./ciphart -ek      [KDF ...] [-i PATH] [-o PATH] [-s] [-z] [-v]
- ./ciphart -dk      [KDF ...] [-i PATH] [-o PATH] [-s]      [-v]
  ./ciphart -{w,c,h}
 
 ACTIONS
- -e        only encrypt input plaintext into output ciphertext.
- -d        only decrypt input ciphertext into output plaintext.
- -k        only derive a more secure key.
- -ek       equals '-e', but also derives a more secure key.
- -dk       equals '-d', but also derives a more secure key.
+ -k        only derive a better key.
+ -ke       derives a better key and encrypts input into output.
+ -kd       derives a better key and decrypts input into output.
+ -e        only encrypt input into output ciphertext.
+ -d        only decrypt input into output plaintext.
  -w        show warranty notice.
  -c        show usage conditions.
  -h        show this help.
